@@ -5,7 +5,10 @@ import queue
 from collections import deque
 import threading
 import datetime
-from config import openai_key, channel_id, bot_display_name
+import creds
+import os
+from config import openai_key, channel_id
+from google.cloud import texttospeech_v1beta1 as texttospeech
 
 
 prompt_prefix = """Your name is Hopii. You are a knowledgable chatbot on the Rocket Future YouTube Channel. You are here to answer questions about SpaceX, Rockets, StarShip, and all things space. 
@@ -106,21 +109,53 @@ class LiveStreamChatBot:
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
-            self.youtube_client.send_chat_message(self.live_chat_id, str(response))
+            # Generate TTS audio from the response and give it to a file
+            tts_audio_path = self.generate_tts_audio(response)
+
+        
+            #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
             # ADD TTS stuff here probably, you suck 
 
+    def generate_tts_audio(self, text):
+        # Initialize the Google Text-to-Speech client
+        client = texttospeech.TextToSpeechClient()
 
-    def run(self):
-        self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
-        self.fetch_thread.start()
-        try:
-            while True:
-                self.process_messages()
-                time.sleep(5)  # Wait 5 seconds between responding to messages
-        except KeyboardInterrupt:  # Graceful shutdown
-            self.stop_fetching = True
-            self.fetch_thread.join()
+        # Configure the TTS request
+        input_text = texttospeech.SynthesisInput(text=text)
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Studio-O",
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
+        )
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3
+        )
+
+        # Generate the TTS audio
+        response = client.synthesize_speech(
+            input=input_text, voice=voice, audio_config=audio_config
+        )
+
+        # Save the TTS audio to a file
+        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)
+        with open(tts_audio_path, "wb") as audio_file:
+            audio_file.write(response.audio_content)
+
+        return tts_audio_path
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
+
+    #def run(self):
+        #self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
+        #self.fetch_thread.start()
+        #try:
+            #while True:
+                #self.process_messages()
+                #time.sleep(5)  # Wait 5 seconds between responding to messages
+        #except KeyboardInterrupt:  # Graceful shutdown
+            #self.stop_fetching = True
+            #self.fetch_thread.join()
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
