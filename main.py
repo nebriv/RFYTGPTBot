@@ -34,7 +34,7 @@ class LiveStreamChatBot:
             print("Not currently live.")
             return False
 
-        self.bot_display_name = bot_display_name
+        #self.bot_display_name = bot_display_name
 
         # Timestamp of the last processed message
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
@@ -144,12 +144,12 @@ class LiveStreamChatBot:
 
         return tts_audio_path
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
+
 
     def run(self):
         #self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
         #self.fetch_thread.start()
-	print ("Hopii is running.")
+	    print ("Hopii is running.")
         #try:
             #while True:
                 #self.process_messages()
@@ -157,6 +157,8 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
         #except KeyboardInterrupt:  # Graceful shutdown
             #self.stop_fetching = True
             #self.fetch_thread.join()
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
