@@ -108,7 +108,7 @@ class LiveStreamChatBot:
 
             self.youtube_client.send_chat_message(self.live_chat_id, str(response))
 
-            # ADD TTS stuff here probably
+            # ADD TTS stuff here probably, you suck 
 
 
     def run(self):
