@@ -146,9 +146,10 @@ class LiveStreamChatBot:
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
-    #def run(self):
+    def run(self):
         #self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
         #self.fetch_thread.start()
+	print ("Hopii is running.")
         #try:
             #while True:
                 #self.process_messages()
