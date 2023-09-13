@@ -7,10 +7,14 @@ import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 import pprint
-
+from google.auth.transport.requests import Request
+from oauth2client.client import flow_from_clientsecrets, AccessTokenCredentials
+from oauth2client.file import Storage
+from oauth2client.tools import run_flow
 
 class YouTubeClient:
     def __init__(self, channel_id):
+
 
         # Load the client secrets from the downloaded JSON
         client_secrets_file = "google_secret.json"
@@ -18,21 +22,28 @@ class YouTubeClient:
         # Define the scopes. For read-only access, "https://www.googleapis.com/auth/youtube.readonly" would suffice
         scopes = ["https://www.googleapis.com/auth/youtube"]
 
-        # Get credentials and create a service object
-        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(client_secrets_file, scopes)
-        # Check if token.json exists
-        if os.path.exists('token.json'):
-            with open('token.json', 'r') as token_file:
-                token_data = json.load(token_file)
-                credentials = Credentials.from_authorized_user_info(token_data)
-        else:
-            flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(client_secrets_file, scopes)
-            credentials = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token_file:
-                token_file.write(credentials.to_json())
+        # Initialize the storage object for our token
+        storage = Storage('token.json')
+        self.credentials = storage.get()
 
-        self.youtube = build("youtube", "v3", credentials=credentials)
+        if not self.credentials or self.credentials.invalid:
+            flow = flow_from_clientsecrets(client_secrets_file, scope=scopes)
+            # Setting access_type to offline here
+            flow.params['access_type'] = 'offline'
+            flow.params['prompt'] = 'consent'
+            self.credentials = run_flow(flow, storage)
+
+        self.youtube = build("youtube", "v3", credentials=self.credentials)
         self.channel_id = channel_id
+
+    def refresh_token(self):
+        if self.credentials.expired:
+            self.credentials = self.credentials.refresh(Request())
+            if self.credentials:
+                with open('token.json', 'w') as token_file:
+                    token_file.write(self.credentials.to_json())
+            else:
+                raise Exception("Failed to refresh token, no credentials returned.")
 
     def get_live_chat_id(self):
         request = self.youtube.liveBroadcasts().list(part="id,snippet,contentDetails,status", broadcastStatus="active")
@@ -49,6 +60,7 @@ class YouTubeClient:
             maxResults=max_results,
             pageToken=page_token
         )
+        self.refresh_token()
         return request.execute()
 
     def send_chat_message(self, live_chat_id, message):
@@ -64,4 +76,5 @@ class YouTubeClient:
                 }
             }
         )
+        self.refresh_token()
         return request.execute()
