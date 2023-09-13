@@ -6,10 +6,12 @@ from collections import deque
 import threading
 import datetime
 import os
-import vlc
-from config import openai_key, channel_id, bot_display_name
+# import vlc
+from config import openai_key, channel_id, bot_display_name, output_device
 from google.cloud import texttospeech_v1beta1 as texttospeech
-
+import sounddevice as sd
+import soundfile as sf
+import numpy as np
 
 prompt_prefix = """You are a human like ai named Hopii, you live in Starhopper, a retired spacecraft in Starbase, TX. You have a passion for spaceflight and rocketry. You are funny, and nice. 
 You often like to reply with ascii emoji's and use terms like haha, and lmao, etc. Starship is the largest, most powerful rocket ever. It may launch again on it's second ever fully integrated flight. 
@@ -20,27 +22,27 @@ You do not respond with customer support like statements. You speak more natural
 class LiveStreamChatBot:
     def __init__(self, channel_id):
         print("Starting")
-        self.youtube_client = YouTubeClient(channel_id)
-        self.bot = ChatGPT()
-        self.bot.setup(openai_key, prompt_prefix=prompt_prefix)
-        self.message_queue = queue.Queue()
-
-        self.all_messages_context = []
-        self.max_global_context_length = 100
-
-        self.live_chat_id = self.youtube_client.get_live_chat_id()
-        if not self.live_chat_id:
-            print("Not currently live.")
-            return False
-
-        self.bot_display_name = bot_display_name
-
-        # Timestamp of the last processed message
-        now = datetime.datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
-        self.last_timestamp = now
-
-        self.stop_fetching = False  # Flag to stop the fetch thread if necessary
-        self.fetch_thread = threading.Thread(target=self.fetch_messages)
+        # self.youtube_client = YouTubeClient(channel_id)
+        # self.bot = ChatGPT()
+        # self.bot.setup(openai_key, prompt_prefix=prompt_prefix)
+        # self.message_queue = queue.Queue()
+        #
+        # self.all_messages_context = []
+        # self.max_global_context_length = 100
+        #
+        # self.live_chat_id = self.youtube_client.get_live_chat_id()
+        # if not self.live_chat_id:
+        #     print("Not currently live.")
+        #     return False
+        #
+        # self.bot_display_name = bot_display_name
+        #
+        # # Timestamp of the last processed message
+        # now = datetime.datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
+        # self.last_timestamp = now
+        #
+        # self.stop_fetching = False  # Flag to stop the fetch thread if necessary
+        # self.fetch_thread = threading.Thread(target=self.fetch_messages)
 
     def fetch_messages(self):
         buffer_time = 5  # Added buffer time in seconds
@@ -147,15 +149,26 @@ class LiveStreamChatBot:
 
         #playsound(audio_file, winsound.SND_ASYNC)
         print("Playing TTS Audio via VLC")
-        audio_file = os.path.join(os.path.dirname(__file__),tts_audio_path)
-        media = vlc.MediaPlayer(audio_file)
-        media.play()
-        
-      
+        audio_file = os.path.join(os.path.dirname(__file__), tts_audio_path)
+        # media = vlc.MediaPlayer(audio_file)
+        # media.play()
+        self.play_audio_file(audio_file)
 
         return tts_audio_path
 
+    def play_audio_file(self, file_path):
+        # Read file to numpy array
+        data, fs = sf.read(file_path, dtype='float32')
 
+        # Set default sample rate
+        sd.default.samplerate = fs
+        sd.default.device = output_device
+
+        # Play the audio
+        sd.play(data)
+
+        # Block execution until audio is finished playing
+        sd.wait()
 
     def run(self):
         self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
@@ -173,4 +186,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
-    bot.run()
+    # bot.run()
+    audio_file = os.path.join(os.path.dirname(__file__), "tts_audio.mp3")
+    bot.play_audio_file(audio_file)

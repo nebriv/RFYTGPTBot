@@ -14,8 +14,7 @@ from oauth2client.tools import run_flow
 
 class YouTubeClient:
     def __init__(self, channel_id):
-
-
+        pass
         # Load the client secrets from the downloaded JSON
         client_secrets_file = "google_secret.json"
 
