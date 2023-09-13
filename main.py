@@ -6,7 +6,6 @@ from collections import deque
 import threading
 import datetime
 import os
-import vlc
 from config import openai_key, channel_id, bot_display_name
 from google.cloud import texttospeech_v1beta1 as texttospeech
 
@@ -104,7 +103,7 @@ class LiveStreamChatBot:
     def process_messages(self):
         while not self.message_queue.empty():
             author, message = self.message_queue.get()
-            response = self.bot.respond_to(author, message, self.all_messages_context)
+            response = self.bot.get_response_text(author, message, self.all_messages_context)
             print(f"Recieved Response from OpenAI: {response}")
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
@@ -143,15 +142,6 @@ class LiveStreamChatBot:
         tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
-        print(f"Saving TTS Return")
-
-        #playsound(audio_file, winsound.SND_ASYNC)
-        print("Playing TTS Audio via VLC")
-        audio_file = os.path.join(os.path.dirname(__file__),tts_audio_path)
-        media = vlc.MediaPlayer(audio_file)
-        media.play()
-        
-      
 
         return tts_audio_path
 
@@ -160,7 +150,7 @@ class LiveStreamChatBot:
     def run(self):
         self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
         self.fetch_thread.start()
-        print ("Hopii is running.")
+        print("Hopii is running.")
         try:
             while True:
                 self.process_messages()

@@ -1,4 +1,6 @@
+from better_profanity import profanity
 class ChatBot:
+    profanity.load_censor_words()
     def __init__(self):
         pass
 
@@ -19,6 +21,11 @@ class ChatBot:
             truncated += "..."
 
         return truncated
+
+    def get_response_text(self, author, chat_message, chat_history=None):
+        if profanity.contains_profanity(chat_message):
+            return "Please don't use profanity."
+        return self.respond_to(author, chat_message, chat_history)
 
     def respond_to(self, message, chat_history=None):
         # Basic logic for now: Echo the message.
