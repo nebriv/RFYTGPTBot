@@ -36,14 +36,6 @@ class YouTubeClient:
         self.youtube = build("youtube", "v3", credentials=self.credentials)
         self.channel_id = channel_id
 
-    def refresh_token(self):
-        if self.credentials.expired:
-            self.credentials = self.credentials.refresh(Request())
-            if self.credentials:
-                with open('token.json', 'w') as token_file:
-                    token_file.write(self.credentials.to_json())
-            else:
-                raise Exception("Failed to refresh token, no credentials returned.")
 
     def get_live_chat_id(self):
         request = self.youtube.liveBroadcasts().list(part="id,snippet,contentDetails,status", broadcastStatus="active")
@@ -60,7 +52,6 @@ class YouTubeClient:
             maxResults=max_results,
             pageToken=page_token
         )
-        self.refresh_token()
         return request.execute()
 
     def send_chat_message(self, live_chat_id, message):
@@ -76,5 +67,4 @@ class YouTubeClient:
                 }
             }
         )
-        self.refresh_token()
         return request.execute()
