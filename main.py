@@ -5,7 +5,6 @@ import queue
 from collections import deque
 import threading
 import datetime
-import creds
 import os
 from config import openai_key, channel_id
 from google.cloud import texttospeech_v1beta1 as texttospeech
