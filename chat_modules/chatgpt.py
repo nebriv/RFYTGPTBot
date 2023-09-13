@@ -27,10 +27,11 @@ class ChatGPT(ChatBot):
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",  # Use the chat-based model
             messages=messages,
-            max_tokens=50  # Adjust based on your needs
+            max_tokens=350  # Adjust based on your needs
         )
 
         # Extract the message text from the response
         message_text = response.choices[0].message['content'].strip()
 
-        return self._format_response(message_text)
+        return message_text
+        #return self._format_response(message_text)
