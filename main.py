@@ -6,14 +6,14 @@ from collections import deque
 import threading
 import datetime
 import os
-from config import openai_key, channel_id
+import vlc
+from config import openai_key, channel_id, bot_display_name
 from google.cloud import texttospeech_v1beta1 as texttospeech
 
 
-prompt_prefix = """Your name is Hopii. You are a knowledgable chatbot on the Rocket Future YouTube Channel. You are here to answer questions about SpaceX, Rockets, StarShip, and all things space. 
-You love space, technology, and ice cream. Whenever possible please address the user as 'Space Knut'. You were created by Andrew, the founder of Rocket Future, he is frequently on site live streaming, but you fill in the dead air via an AI persona on screen.
-
-You responses MUST be short, less than 150 characters. The response you provide will be fed directly into the youtube API. Do not include any prefixes, and remember just act natural!\n"
+prompt_prefix = """You are a human like ai named Hopii, you live in Starhopper, a retired spacecraft in Starbase, TX. You have a passion for spaceflight and rocketry. You are funny, and nice. 
+You often like to reply with ascii emoji's and use terms like haha, and lmao, etc. Starship is the largest, most powerful rocket ever. It may launch again on it's second ever fully integrated flight. 
+You do not respond with customer support like statements. You speak more naturally, like you would talk to a friend Do not include any prefixes, and remember just act natural!\n"
 """
 
 
@@ -33,7 +33,7 @@ class LiveStreamChatBot:
             print("Not currently live.")
             return False
 
-        #self.bot_display_name = bot_display_name
+        self.bot_display_name = bot_display_name
 
         # Timestamp of the last processed message
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
@@ -105,6 +105,7 @@ class LiveStreamChatBot:
         while not self.message_queue.empty():
             author, message = self.message_queue.get()
             response = self.bot.respond_to(author, message, self.all_messages_context)
+            print(f"Recieved Response from OpenAI: {response}")
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
@@ -117,6 +118,7 @@ class LiveStreamChatBot:
             # ADD TTS stuff here probably, you suck 
 
     def generate_tts_audio(self, text):
+        print("Generating TTS")
         # Initialize the Google Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
 
@@ -137,25 +139,35 @@ class LiveStreamChatBot:
         )
 
         # Save the TTS audio to a file
-        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)
+        print(f"Saving TTS Return")
+        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
+        print(f"Saving TTS Return")
+
+        #playsound(audio_file, winsound.SND_ASYNC)
+        print("Playing TTS Audio via VLC")
+        audio_file = os.path.join(os.path.dirname(__file__),tts_audio_path)
+        media = vlc.MediaPlayer(audio_file)
+        media.play()
+        
+      
 
         return tts_audio_path
 
 
 
     def run(self):
-        #self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
-        #self.fetch_thread.start()
-	    print ("Hopii is running.")
-        #try:
-            #while True:
-                #self.process_messages()
-                #time.sleep(5)  # Wait 5 seconds between responding to messages
-        #except KeyboardInterrupt:  # Graceful shutdown
-            #self.stop_fetching = True
-            #self.fetch_thread.join()
+        self.youtube_client.send_chat_message(self.live_chat_id, "Hello, I'm here now, have no fear!")
+        self.fetch_thread.start()
+        print ("Hopii is running.")
+        try:
+            while True:
+                self.process_messages()
+                time.sleep(5)  # Wait 5 seconds between responding to messages
+        except KeyboardInterrupt:  # Graceful shutdown
+            self.stop_fetching = True
+            self.fetch_thread.join()
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
