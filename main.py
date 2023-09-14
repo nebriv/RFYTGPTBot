@@ -51,6 +51,7 @@ class LiveStreamChatBot:
 
             # Pagination loop to fetch all the messages
             while True:
+                # Double check if this is exceeding quotas. If so, increase the polling interval
                 messages_data = self.youtube_client.get_live_chat_messages(self.live_chat_id,
                                                                            page_token=next_page_token, max_results=max_results)
                 print(f"Got {len(messages_data['items'])} messages")
