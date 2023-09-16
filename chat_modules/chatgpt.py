@@ -25,7 +25,7 @@ class ChatGPT(ChatBot):
         print(f"Sending messages to OpenAI: {messages}")
 
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Use the chat-based model
+            model="gpt-4",  # Use the chat-based model
             messages=messages,
             max_tokens=350  # Adjust based on your needs
         )
