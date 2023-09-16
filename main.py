@@ -144,8 +144,8 @@ class LiveStreamChatBot:
         input_text = texttospeech.SynthesisInput(text=text)
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            #name="en-US-Studio-O",
-            name="en-US-Neural2-F",
+            name="en-US-Studio-O",
+            #name="en-US-Neural2-F",
             ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
         )
         audio_config = texttospeech.AudioConfig(
@@ -188,7 +188,7 @@ class LiveStreamChatBot:
         sd.wait()
 
     def run(self):
-        self.youtube_client.send_chat_message(self.live_chat_id, "Hopii, wake up!")
+        self.youtube_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         print ("Hopii is running.")
         try:
