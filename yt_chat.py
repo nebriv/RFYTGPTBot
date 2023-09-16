@@ -39,6 +39,10 @@ class YouTubeClient:
         request = self.youtube.liveBroadcasts().list(part="id,snippet,contentDetails,status", broadcastStatus="active")
         response = request.execute()
 
+        if len(response['items']) == 0:
+            print("No active live streams found.")
+            return None
+
         if response['items'][0]['status']['lifeCycleStatus'] != 'live':
             return None
         return response['items'][0]['snippet']['liveChatId']

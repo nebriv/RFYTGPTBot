@@ -101,7 +101,7 @@ class LiveStreamChatBot:
         while not self.message_queue.empty():
             author, message = self.message_queue.get()
             formatted_message = f"From: {author}, {message}"
-            response = self.bot.respond_to(author, formatted_message, self.all_messages_context)
+            response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
             print(f"Recieved Response from OpenAI: {response}")
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
@@ -171,7 +171,7 @@ class LiveStreamChatBot:
     def run(self):
         self.youtube_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
-        print ("Hopii is running.")
+        print("Hopii is running.")
         try:
             while True:
                 self.process_messages()
