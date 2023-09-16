@@ -49,9 +49,14 @@ class LiveStreamChatBot:
             # Pagination loop to fetch all the messages
             while True:
                 # Double check if this is exceeding quotas. If so, increase the polling interval
+                start_time = time.time()
                 messages_data = self.youtube_client.get_live_chat_messages(self.live_chat_id,
                                                                            page_token=next_page_token, max_results=max_results)
+                end_time = time.time()  # Add timestamp at the end
+                step_time = end_time - start_time
                 print(f"Got {len(messages_data['items'])} messages")
+                print(f"Time taken for retrieving YouTube chat messages: {step_time} seconds")
+               
                 # Append new messages. Since we're paginating from oldest to newest,
                 # the older messages are prepended to maintain order.
                 latest_messages = messages_data['items'] + latest_messages
@@ -108,7 +113,11 @@ class LiveStreamChatBot:
             self.all_messages_context = self.all_messages_context[-100:]
 
             # Generate TTS audio from the response and give it to a file
+            start_time = time.time()
             tts_audio_path = self.generate_tts_audio(response)
+            end_time = time.time()  # Add timestamp at the end
+            step_time = end_time - start_time
+            print(f"Time taken for generating TTS audio: {step_time} seconds")
             print("Playing TTS Audio")
             self.play_audio_file(tts_audio_path)
 
