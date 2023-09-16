@@ -1,6 +1,7 @@
 google_secret.json
 token.json
 config.py
+prompt_config.py
 googleapi.json
 tts_audio.wav
 tts_audio.mp3
