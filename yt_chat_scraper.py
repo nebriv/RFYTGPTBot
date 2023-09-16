@@ -83,8 +83,10 @@ def convert_timestamp(ts):
 
 class YoutubeChatScraper:
 
-    def __init__(self, url, driver_options=None):
-        self.url = url
+    def __init__(self, live_id, bot_display_name, driver_options=None):
+        self.bot_display_name = bot_display_name
+        self.url = f"https://www.youtube.com/live_chat?is_popout=1&v={live_id}"
+        print(self.url)
         self.driver = self._initialize_driver(driver_options)
         self.seen_messages = set()
         self.message_queue = queue.Queue()
@@ -206,22 +208,27 @@ class YoutubeChatScraper:
                     message = self.driver.execute_script("return arguments[0].innerText;",
                                                     container.find_element(By.CSS_SELECTOR, "span#message")).strip()
 
+                    self.seen_messages.add(message_id)
+
+                    # print(f"SCRAPED: {message}")
+                    if author_name == self.bot_display_name:
+                        continue
+
                     self.message_queue.put({
                         'author': author_name,
                         'timestamp': timestamp,
                         'message': message
                     })
-                    self.seen_messages.add(message_id)
             except StaleElementReferenceException:
                 print("Stale element encountered...")
                 continue
-        # Print the extracted data
-        for item in new_messages:
-            print(f"Author: {item['author']}, Timestamp: {item['timestamp']}, Message: {item['message']}")
+        # # Print the extracted data
+        # for item in new_messages:
+        #     print(f"Author: {item['author']}, Timestamp: {item['timestamp']}, Message: {item['message']}")
 
         # Emulate random interactions
-        if random.random() < 0.5:
-            random_sleep = random.uniform(1.0, 3.0)
+        if random.random() < 0.33:
+            random_sleep = random.uniform(0.1, 2.0)
             random_interactions(self.driver, random_sleep)
 
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
