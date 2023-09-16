@@ -100,7 +100,7 @@ class LiveStreamChatBot:
     def process_messages(self):
         while not self.message_queue.empty():
             author, message = self.message_queue.get()
-            formatted_message = f"From: {author} {message}"
+            formatted_message = f"From: {author}, {message}"
             response = self.bot.respond_to(author, formatted_message, self.all_messages_context)
             print(f"Recieved Response from OpenAI: {response}")
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
