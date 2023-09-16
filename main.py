@@ -112,7 +112,6 @@ class LiveStreamChatBot:
             # Generate TTS audio from the response and give it to a file
             tts_audio_path = self.generate_tts_audio(response)
 
-        
             #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
             # ADD TTS stuff here probably, you suck 
