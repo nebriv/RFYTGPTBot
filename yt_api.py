@@ -1,9 +1,10 @@
-from oauth2client.client import flow_from_clientsecrets, AccessTokenCredentials
-from oauth2client.file import Storage
-from oauth2client.tools import run_flow
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+import os
 
 from logger import logger
+import pickle
 
 class YouTubeClient:
     def __init__(self, channel_id):
@@ -13,18 +14,27 @@ class YouTubeClient:
         # Define the scopes. For read-only access, "https://www.googleapis.com/auth/youtube.readonly" would suffice
         scopes = ["https://www.googleapis.com/auth/youtube"]
 
-        # Initialize the storage object for our token
-        storage = Storage('token.json')
-        self.credentials = storage.get()
+        # Check if token.pickle file exists
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+        else:
+            creds = None
 
-        if not self.credentials or self.credentials.invalid:
-            flow = flow_from_clientsecrets(client_secrets_file, scope=scopes)
-            # Setting access_type to offline here
-            flow.params['access_type'] = 'offline'
-            flow.params['prompt'] = 'consent'
-            self.credentials = run_flow(flow, storage)
+        # If there are no (valid) credentials available, prompt the user to log in
+        if not creds or not creds.valid:
+            flow = InstalledAppFlow.from_client_secrets_file(client_secrets_file, scopes)
 
-        self.youtube = build("youtube", "v3", credentials=self.credentials)
+            # Explicitly request offline access
+            flow.authorization_url(prompt='consent', access_type='offline')
+
+            creds = flow.run_local_server(port=0)
+
+            # Save the credentials for the next run
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
+
+        self.youtube = build("youtube", "v3", credentials=creds)
         self.channel_id = channel_id
 
     def get_live_chat_id(self):

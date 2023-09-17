@@ -23,6 +23,11 @@ class LiveStreamChatBot:
     def __init__(self, channel_id):
         logger.info("Starting LiveStreamChatBot")
         self.youtube_api_client = YouTubeClient(channel_id)
+        self.live_id = self.youtube_api_client.get_live_id()
+        if not self.live_id:
+            logger.error(f"Channel {channel_id} is not currently live.")
+            exit()
+
         self.youtube_chat = None
         self.chat_scraper = None
 
@@ -142,7 +147,7 @@ class LiveStreamChatBot:
             logger.info(f"Saving {counter} messages to file.")
             # Write back to the file
             with open(self.output_file_path, 'w') as f:
-                json.dump(messages, f)
+                json.dump(messages, f, indent=4)
 
     def batched_file_writer(self, interval=30):
         """Repeatedly save messages to the file in batches every `interval` seconds."""

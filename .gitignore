@@ -6,6 +6,7 @@ googleapi.json
 tts_audio.wav
 tts_audio.mp3
 chat_logs/
+token.pickle
 
 ### JetBrains template
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
