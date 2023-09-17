@@ -8,13 +8,16 @@ from config import openai_key, channel_id, bot_display_name, output_device
 from google.cloud import texttospeech_v1beta1 as texttospeech
 import sounddevice as sd
 import soundfile as sf
-from prompt_config import prompt_prefix
+import prompt_config
 from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
 from chat_fetchers.yt_api_chat import YouTubeChat
 from chat_merger import ChatMerger
 from logger import logger
 import json
 from datetime import datetime
+import importlib
+
+prompt_prefix = prompt_config.prompt_prefix
 
 class LiveStreamChatBot:
     def __init__(self, channel_id):
@@ -35,6 +38,7 @@ class LiveStreamChatBot:
         time.sleep(30)
 
         self.bot = ChatGPT()
+
         self.bot.setup(openai_key, prompt_prefix=prompt_prefix)
         self.message_queue = queue.Queue()
 
@@ -54,8 +58,10 @@ class LiveStreamChatBot:
         
         self.stop_running = False  # Flag to stop the fetch thread if necessary
         self.first_run = True
+        self.prompt_refresh_interval = 300  # Seconds between refreshing the prompt
         self.fetch_thread = threading.Thread(target=self.fetch_messages)
         self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(30,))
+        self.refresh_prompt_thread = threading.Thread(target=self.refresh_prompt)
         self.message_log = queue.Queue()
 
         self.setup()
@@ -67,6 +73,13 @@ class LiveStreamChatBot:
         # Generate the filename based on the current date and time
         current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.output_file_path = f"chat_logs/{current_datetime_str}.json"
+
+    def refresh_prompt(self):
+        while not self.stop_running:
+            time.sleep(self.prompt_refresh_interval)
+            logger.info("Refreshing prompt")
+            importlib.reload(prompt_config)
+            self.bot.prompt_prefix = prompt_config.prompt_prefix
 
     def fetch_messages(self, chat_log_file=None):
         logger.info("Fetching Messages")
@@ -123,7 +136,7 @@ class LiveStreamChatBot:
             messages.append(self.message_log.get())
             counter += 1
 
-        if len(messages) > 0:
+        if len(counter) > 0:
             logger.info(f"Saving {counter} messages to file.")
             # Write back to the file
             with open(self.output_file_path, 'w') as f:
@@ -232,6 +245,7 @@ class LiveStreamChatBot:
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
+        self.refresh_prompt_thread.start()
         logger.info("Hopii is running.")
         try:
             while True:
@@ -239,6 +253,7 @@ class LiveStreamChatBot:
                 time.sleep(1)  # Wait 1 seconds between responding to messages
         except KeyboardInterrupt:  # Graceful shutdown
             logger.info("Shutting down Hopii.")
+            self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
             self.stop_running = True
             if self.chat_scraper:
                 self.chat_scraper.stop()
@@ -246,6 +261,7 @@ class LiveStreamChatBot:
                 self.youtube_chat.stop()
             self.file_writer_thread.join()
             self.fetch_thread.join()
+            self.refresh_prompt_thread.join()
             logger.info("Hopii has shut down.")
             exit()
 
