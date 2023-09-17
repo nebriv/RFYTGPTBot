@@ -28,7 +28,9 @@ class LiveStreamChatBot:
 
         # if YouTubeChat:
         #     self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+        #     time.sleep(2)
         #     self.youtube_chat.start_threaded()
+        #     time.sleep(2)
 
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
