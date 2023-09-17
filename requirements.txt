@@ -11,6 +11,7 @@ catalogue==1.0.2
 certifi==2023.7.22
 cffi==1.15.1
 charset-normalizer==3.2.0
+chromedriver-autoinstaller==0.6.2
 cleo==2.0.1
 colorama==0.4.6
 crashtest==0.4.1
