@@ -1,20 +1,19 @@
 import logging
 
 # Create a logger named 'myapp'
-logger = logging.getLogger('myapp')
-logger.setLevel(logging.DEBUG)  # Set level for your application
-
+logger = logging.getLogger('RFYTGPTBot')
+logger.setLevel(logging.INFO)  # Set level for your application
+logger.propagate = False
 # Create a console handler and set level to debug
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)  # Or whichever level you want
+ch.setLevel(logging.INFO)  # Or whichever level you want
 
 # Create formatter
-formatter = logging.Formatter('%(name)s (%(module)s.%(funcName)s) - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s (%(module)s.%(funcName)s) - %(levelname)s - %(message)s')
 
 # Add formatter to ch
 ch.setFormatter(formatter)
 
-# Add ch to logger
 logger.addHandler(ch)
 
 # This line sets the logging level for all third-party libraries to WARNING

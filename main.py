@@ -3,9 +3,7 @@ from yt_api import YouTubeClient
 import time
 import queue
 import threading
-import datetime
 import os
-# import vlc
 from config import openai_key, channel_id, bot_display_name, output_device
 from google.cloud import texttospeech_v1beta1 as texttospeech
 import sounddevice as sd
@@ -15,6 +13,8 @@ from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
 from chat_fetchers.yt_api_chat import YouTubeChat
 from chat_merger import ChatMerger
 from logger import logger
+import json
+from datetime import datetime
 
 class LiveStreamChatBot:
     def __init__(self, channel_id):
@@ -23,9 +23,9 @@ class LiveStreamChatBot:
         self.youtube_chat = None
         self.chat_scraper = None
 
-        if YouTubeChat:
-            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
-            self.youtube_chat.start_threaded()
+        # if YouTubeChat:
+        #     self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+        #     self.youtube_chat.start_threaded()
 
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
@@ -49,16 +49,53 @@ class LiveStreamChatBot:
         self.bot_display_name = bot_display_name
         
         # Timestamp of the last processed message
-        now = datetime.datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
+        now = datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
         self.last_timestamp = now
         
-        self.stop_fetching = False  # Flag to stop the fetch thread if necessary
+        self.stop_running = False  # Flag to stop the fetch thread if necessary
         self.first_run = True
         self.fetch_thread = threading.Thread(target=self.fetch_messages)
+        self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(30,))
+        self.message_log = queue.Queue()
 
-    def fetch_messages(self):
+        self.setup()
+
+    def setup(self):
+        if not os.path.exists('chat_logs'):
+            os.makedirs('chat_logs')
+
+        # Generate the filename based on the current date and time
+        current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.output_file_path = f"chat_logs/{current_datetime_str}.json"
+
+    def fetch_messages(self, chat_log_file=None):
         logger.info("Fetching Messages")
-        while not self.stop_fetching:
+
+        if chat_log_file:
+            with open(chat_log_file, 'r') as f:
+                chat_log = json.load(f)
+
+            prev_timestamp = None
+            for entry in chat_log:
+                if prev_timestamp:
+                    # Calculate delay based on the difference in timestamps
+                    time_diff = datetime.fromisoformat(entry['timestamp']) - datetime.fromisoformat(prev_timestamp)
+                    delay = time_diff.total_seconds()
+                    time.sleep(delay)  # sleep for the difference in timestamps
+                self.message_queue.put({
+                    "author": entry['author'],
+                    "timestamp": entry['timestamp'],
+                    "message": entry['message']
+                })
+                self.all_messages_context.append({
+                    "author": entry['author'],
+                    "timestamp": entry['timestamp'],
+                    "message": entry['message']
+                })
+                prev_timestamp = entry['timestamp']
+            return
+
+        while not self.stop_running:
 
             merger = ChatMerger(self.chat_scraper, self.youtube_chat)
             messages = merger.get_unique_messages()
@@ -72,24 +109,63 @@ class LiveStreamChatBot:
                     self.message_queue.put(message)
                     self.all_messages_context.append(message)
 
+    def save_messages_to_file(self):
+        """Save all messages from the queue to the file."""
+        logger.info("Writing message log to file.")
+        try:
+            with open(self.output_file_path, 'r') as f:
+                messages = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            messages = []
+
+        # Add messages from the queue
+        while not self.message_log.empty():
+            messages.append(self.message_log.get())
+        
+        if len(messages) > 0:
+            logger.info(f"Saving {len(messages)} messages to file.")
+            # Write back to the file
+            with open(self.output_file_path, 'w') as f:
+                json.dump(messages, f)
+
+    def batched_file_writer(self, interval=30):
+        """Repeatedly save messages to the file in batches every `interval` seconds."""
+        while not self.stop_running:
+            time.sleep(interval)
+            self.save_messages_to_file()
+
 
     def process_messages(self):
-        while not self.message_queue.empty():
-            author, timestamp, message = self.message_queue.get()
+        while not self.message_queue.empty() and not self.stop_running:
+            raw_output = self.message_queue.get()
+
+            author = raw_output['author']
+            timestamp = raw_output['timestamp']
+            message = raw_output['message']
+
             formatted_message = f"From: {author}, {message}"
-            response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
+            response = "Oops! I've momentarily slipped into another dimension. Let's realign our cosmic frequencies and try that again."
+            try:
+                response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
+            except Exception as e:
+                logger.error(f"Error while getting response from OpenAI: {e}", exc_info=True)
+
+            self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response})
+            logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
             logger.debug(f"Recieved Response from OpenAI: {response}")
+
+
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
             # Generate TTS audio from the response and give it to a file
             start_time = time.time()
-            tts_audio_path = self.generate_tts_audio(response)
-            end_time = time.time()  # Add timestamp at the end
-            step_time = end_time - start_time
-            logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
-            logger.debug("Playing TTS Audio")
-            self.play_audio_file(tts_audio_path)
+            # tts_audio_path = self.generate_tts_audio(response)
+            # end_time = time.time()  # Add timestamp at the end
+            # step_time = end_time - start_time
+            # logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+            # logger.debug("Playing TTS Audio")
+            # self.play_audio_file(tts_audio_path)
 
             #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
@@ -149,14 +225,23 @@ class LiveStreamChatBot:
     def run(self):
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
+        self.file_writer_thread.start()
         logger.info("Hopii is running.")
         try:
             while True:
                 self.process_messages()
                 time.sleep(1)  # Wait 1 seconds between responding to messages
         except KeyboardInterrupt:  # Graceful shutdown
-            self.stop_fetching = True
+            logger.info("Shutting down Hopii.")
+            self.stop_running = True
+            if self.chat_scraper:
+                self.chat_scraper.stop()
+            if self.youtube_chat:
+                self.youtube_chat.stop()
+            self.file_writer_thread.join()
             self.fetch_thread.join()
+            logger.info("Hopii has shut down.")
+            exit()
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
