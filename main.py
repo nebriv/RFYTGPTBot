@@ -1,8 +1,7 @@
-from chat_modules.chatgpt import ChatGPT
-from yt_chat import YouTubeClient
+from chat_response_modules.chatgpt import ChatGPT
+from yt_api import YouTubeClient
 import time
 import queue
-from collections import deque
 import threading
 import datetime
 import os
@@ -11,10 +10,9 @@ from config import openai_key, channel_id, bot_display_name, output_device
 from google.cloud import texttospeech_v1beta1 as texttospeech
 import sounddevice as sd
 import soundfile as sf
-import numpy as np
 from prompt_config import prompt_prefix
-from yt_chat_scraper import YoutubeChatScraper
-from yt_chat import YouTubeChat
+from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
+from chat_fetchers.yt_api_chat import YouTubeChat
 from chat_merger import ChatMerger
 
 class LiveStreamChatBot:
