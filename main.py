@@ -22,11 +22,13 @@ class LiveStreamChatBot:
         self.youtube_chat = None
         self.chat_scraper = None
 
-        # self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
-        # self.youtube_chat.start_threaded()
+        if YouTubeChat:
+            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+            self.youtube_chat.start_threaded()
 
-        self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
-        self.chat_scraper.start_threaded()
+        if YoutubeChatScraper:
+            self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
+            self.chat_scraper.start_threaded()
 
         print("Letting chat gather for 30 seconds")
         time.sleep(30)
@@ -59,12 +61,6 @@ class LiveStreamChatBot:
 
             merger = ChatMerger(self.chat_scraper, self.youtube_chat)
             messages = merger.get_unique_messages()
-
-
-            # for message in messages:
-            #     print(f"Recieved Message: {message}")
-            #     self.message_queue.put(message)
-            #     self.all_messages_context.append(message)
 
             if self.first_run:
                 self.all_messages_context = messages

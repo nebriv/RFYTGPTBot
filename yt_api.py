@@ -49,7 +49,6 @@ class YouTubeClient:
         if len(response['items']) == 0:
             print("No active live streams found.")
             return None
-        print(response['items'])
         if response['items'][0]['status']['lifeCycleStatus'] != 'live':
             return None
         return response['items'][0]['snippet']['liveChatId']
@@ -92,15 +91,6 @@ class YouTubeClient:
 
 if __name__ == '__main__':
     from config import *
-    yt = YouTubeClient("UC_x5XG1OV2P6uZZ5FSM9Ttw")
-    scraper = YouTubeChat(yt, bot_display_name)
-    try:
-        scraper.start_threaded()
-        while True:
-            message = scraper.message_queue.get()  # Blocking call, will wait until a new message is available
-            print(f"Author: {message['author']}, Timestamp: {message['timestamp']}, Message: {message['message']}")
-    except KeyboardInterrupt:
-        scraper.stop()
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        scraper.stop()
+    yt = YouTubeClient(channel_id)
+    live_chat_id = yt.get_live_chat_id()
+    print(live_chat_id)
