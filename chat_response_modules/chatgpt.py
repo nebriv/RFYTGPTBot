@@ -16,7 +16,7 @@ class ChatGPT(ChatBot):
 
         # Add the chat history
         if chat_history:
-            for past_author, past_message in chat_history:
+            for past_author, timestamp, past_message in chat_history:
                 messages.append({"role": "user", "content": f"{past_author}: {past_message}"})
 
         # Add the most recent chat message
