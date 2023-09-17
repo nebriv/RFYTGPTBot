@@ -1,22 +1,21 @@
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import os
 
-from logger import logger
+from lib.logger import logger
 import pickle
 
 class YouTubeClient:
     def __init__(self, channel_id):
         # Load the client secrets from the downloaded JSON
-        client_secrets_file = "google_secret.json"
+        client_secrets_file = "../google_secret.json"
 
         # Define the scopes. For read-only access, "https://www.googleapis.com/auth/youtube.readonly" would suffice
         scopes = ["https://www.googleapis.com/auth/youtube"]
 
         # Check if token.pickle file exists
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
+        if os.path.exists('../token.pickle'):
+            with open('../token.pickle', 'rb') as token:
                 creds = pickle.load(token)
         else:
             creds = None
@@ -31,7 +30,7 @@ class YouTubeClient:
             creds = flow.run_local_server(port=0)
 
             # Save the credentials for the next run
-            with open('token.pickle', 'wb') as token:
+            with open('../token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
         self.youtube = build("youtube", "v3", credentials=creds)

@@ -2,11 +2,12 @@ import queue
 import threading
 import time
 from googleapiclient.errors import HttpError
-from logger import logger
+from lib.logger import logger
 
 class YouTubeChat:
 
     def __init__(self, youtube_client, bot_display_name):
+        logger.info("Initializing YouTubeChat API")
         self.bot_display_name = bot_display_name
         self.live_chat_id = None
         self.next_page_token = None
@@ -25,6 +26,7 @@ class YouTubeChat:
         self.running = True
 
     def fetch_messages(self):
+        logger.verbose("Fetching messages from YouTube API")
         if not self.live_chat_id:
             self.live_chat_id = self.youtube.get_live_chat_id()
 

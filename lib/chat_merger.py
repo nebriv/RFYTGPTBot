@@ -1,6 +1,6 @@
 import hashlib
 import queue
-from logger import logger
+from lib.logger import logger
 
 class ChatMerger:
 

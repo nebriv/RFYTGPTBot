@@ -1,5 +1,5 @@
 from chat_response_modules.chatgpt import ChatGPT
-from yt_api import YouTubeClient
+from lib.yt_api import YouTubeClient
 import time
 import queue
 import threading
@@ -11,12 +11,12 @@ import soundfile as sf
 import prompt_config
 from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
 from chat_fetchers.yt_api_chat import YouTubeChat
-from chat_merger import ChatMerger
-from logger import logger
+from lib.chat_merger import ChatMerger
+from lib.logger import logger
 import json
 from datetime import datetime
 import importlib
-
+from lib.context_parsing import ContextParser
 prompt_prefix = prompt_config.prompt_prefix
 
 class LiveStreamChatBot:
@@ -31,11 +31,11 @@ class LiveStreamChatBot:
         self.youtube_chat = None
         self.chat_scraper = None
 
-        # if YouTubeChat:
-        #     self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
-        #     time.sleep(2)
-        #     self.youtube_chat.start_threaded()
-        #     time.sleep(2)
+        if YouTubeChat:
+            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+            time.sleep(2)
+            self.youtube_chat.start_threaded()
+            time.sleep(2)
 
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
@@ -143,7 +143,7 @@ class LiveStreamChatBot:
             messages.append(self.message_log.get())
             counter += 1
 
-        if len(counter) > 0:
+        if counter > 0:
             logger.info(f"Saving {counter} messages to file.")
             # Write back to the file
             with open(self.output_file_path, 'w') as f:
@@ -153,7 +153,10 @@ class LiveStreamChatBot:
         """Repeatedly save messages to the file in batches every `interval` seconds."""
         while not self.stop_running:
             time.sleep(interval)
-            self.save_messages_to_file()
+            try:
+                self.save_messages_to_file()
+            except Exception as e:
+                logger.error(f"Error while saving messages to file: {e}", exc_info=True)
 
 
     def process_messages(self):
@@ -163,6 +166,9 @@ class LiveStreamChatBot:
             author = raw_output['author']
             timestamp = raw_output['timestamp']
             message = raw_output['message']
+
+
+
 
             formatted_message = f"From: {author}, {message}"
             response = "Oops! I've momentarily slipped into another dimension. Let's realign our cosmic frequencies and try that again."

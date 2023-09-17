@@ -5,13 +5,13 @@ import time
 import random
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException, MoveTargetOutOfBoundsException
 import logging
 import threading
 import queue
-from logger import logger
+from lib.logger import logger
 chromedriver_autoinstaller.install()
 
 logging.basicConfig(level=logging.INFO)
@@ -152,7 +152,7 @@ class YoutubeChatScraper:
         self.original_title = self.driver.title
 
 
-        logger.debug("Locating Top chat dropdown...")
+        logger.verbose("Locating Top chat dropdown...")
         try:
             dropdown_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[text()='Top chat']"))
@@ -165,6 +165,7 @@ class YoutubeChatScraper:
             raise Exception("Timeout while trying to click on the dropdown button with text 'Top chat'.")
 
         time.sleep(1)
+        logger.verbose("Locating All messages are visible option...")
         try:
             desired_option = WebDriverWait(self.driver, 10).until(
                 EC.visibility_of_element_located((By.XPATH, "//div[contains(text(),'All messages are visible')]/../.."))
@@ -178,7 +179,7 @@ class YoutubeChatScraper:
 
         time.sleep(2)
 
-        logger.debug("Done waiting... loading chat...")
+        logger.verbose("Done waiting... loading chat...")
         # This will wait until at least one chat message renderer is present
         WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "yt-live-chat-text-message-renderer"))
@@ -186,7 +187,7 @@ class YoutubeChatScraper:
 
     def get_chat_data(self):
         self.running = True
-        logger.debug("Getting chat data...")
+        logger.verbose("Getting chat data...")
         # Find all chat container elements
         chat_containers = self.driver.find_elements(By.CSS_SELECTOR, "yt-live-chat-text-message-renderer")
         if not chat_containers:
@@ -248,7 +249,7 @@ class YoutubeChatScraper:
             try:
                 self.get_chat_data()
             except Exception as e:
-                logger.error(f"Error while getting chat data: {e}")
+                logger.error(f"Error while getting chat data: {e}", exc_info=True)
                 if self.stop_event.is_set():
                     break
                 self.error_count += 1

@@ -1,6 +1,6 @@
 import openai
 from .base import ChatBot
-from logger import logger
+from lib.logger import logger
 
 class ChatGPT(ChatBot):
 
