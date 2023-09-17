@@ -111,19 +111,20 @@ class LiveStreamChatBot:
 
     def save_messages_to_file(self):
         """Save all messages from the queue to the file."""
-        logger.info("Writing message log to file.")
         try:
             with open(self.output_file_path, 'r') as f:
                 messages = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             messages = []
 
+        counter = 0
         # Add messages from the queue
         while not self.message_log.empty():
             messages.append(self.message_log.get())
-        
+            counter += 1
+
         if len(messages) > 0:
-            logger.info(f"Saving {len(messages)} messages to file.")
+            logger.info(f"Saving {counter} messages to file.")
             # Write back to the file
             with open(self.output_file_path, 'w') as f:
                 json.dump(messages, f)
@@ -160,12 +161,17 @@ class LiveStreamChatBot:
 
             # Generate TTS audio from the response and give it to a file
             start_time = time.time()
-            # tts_audio_path = self.generate_tts_audio(response)
-            # end_time = time.time()  # Add timestamp at the end
-            # step_time = end_time - start_time
-            # logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
-            # logger.debug("Playing TTS Audio")
-            # self.play_audio_file(tts_audio_path)
+            try:
+                tts_audio_path = self.generate_tts_audio(response)
+            except Exception as e:
+                logger.error(f"Error while generating TTS audio: {e}", exc_info=True)
+                continue
+            end_time = time.time()  # Add timestamp at the end
+            step_time = end_time - start_time
+            logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+            logger.debug("Playing TTS Audio")
+            self.play_audio_file(tts_audio_path)
+            os.remove(tts_audio_path)
 
             #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
