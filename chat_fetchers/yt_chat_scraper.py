@@ -249,6 +249,8 @@ class YoutubeChatScraper:
                 self.get_chat_data()
             except Exception as e:
                 logger.error(f"Error while getting chat data: {e}")
+                if self.stop_event.is_set():
+                    break
                 self.error_count += 1
 
                 if self.error_count >= self.MAX_ERRORS and not self.restart_attempt:
@@ -268,8 +270,8 @@ class YoutubeChatScraper:
 
     def stop(self):
         self.stop_event.set()
-        self.scraper_thread.join()  # Wait for the thread to finish
         self.driver.quit()
+        self.scraper_thread.join()  # Wait for the thread to finish
         self.running = False
 
 
