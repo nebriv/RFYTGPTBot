@@ -14,6 +14,7 @@ import soundfile as sf
 import numpy as np
 from prompt_config import prompt_prefix
 
+
 class LiveStreamChatBot:
     def __init__(self, channel_id):
         print("Starting")

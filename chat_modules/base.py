@@ -1,4 +1,6 @@
 from better_profanity import profanity
+
+
 class ChatBot:
     profanity.load_censor_words()
     def __init__(self):
