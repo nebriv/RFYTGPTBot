@@ -1,5 +1,6 @@
 import hashlib
 import queue
+from logger import logger
 
 class ChatMerger:
 
@@ -37,7 +38,7 @@ class ChatMerger:
                 if content not in seen_messages_content:
                     seen_messages_content.add(content)
                     unique_messages.append(message)
-
+        logger.info(f"Found {len(unique_messages)} unique messages")
         return unique_messages
 
     def _extract_messages_from_queue(self, q):

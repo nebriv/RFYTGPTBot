@@ -14,11 +14,11 @@ from prompt_config import prompt_prefix
 from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
 from chat_fetchers.yt_api_chat import YouTubeChat
 from chat_merger import ChatMerger
-
+from logger import logger
 
 class LiveStreamChatBot:
     def __init__(self, channel_id):
-        print("Starting")
+        logger.info("Starting LiveStreamChatBot")
         self.youtube_api_client = YouTubeClient(channel_id)
         self.youtube_chat = None
         self.chat_scraper = None
@@ -31,7 +31,7 @@ class LiveStreamChatBot:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
             self.chat_scraper.start_threaded()
 
-        print("Letting chat gather for 30 seconds")
+        logger.info("Letting chat gather for 30 seconds")
         time.sleep(30)
 
         self.bot = ChatGPT()
@@ -43,7 +43,7 @@ class LiveStreamChatBot:
 
         self.live_chat_id = self.youtube_api_client.get_live_chat_id()
         if not self.live_chat_id:
-            print("Not currently live.")
+            logger.error("Not currently live.")
             return False
 
         self.bot_display_name = bot_display_name
@@ -57,7 +57,7 @@ class LiveStreamChatBot:
         self.fetch_thread = threading.Thread(target=self.fetch_messages)
 
     def fetch_messages(self):
-        print("Fetching Messages")
+        logger.info("Fetching Messages")
         while not self.stop_fetching:
 
             merger = ChatMerger(self.chat_scraper, self.youtube_chat)
@@ -68,7 +68,7 @@ class LiveStreamChatBot:
                 self.first_run = False
             else:
                 for message in messages:
-                    print(f"Recieved Message: {message}")
+                    logger.debug(f"Recieved Message: {message}")
                     self.message_queue.put(message)
                     self.all_messages_context.append(message)
 
@@ -78,7 +78,7 @@ class LiveStreamChatBot:
             author, timestamp, message = self.message_queue.get()
             formatted_message = f"From: {author}, {message}"
             response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
-            print(f"Recieved Response from OpenAI: {response}")
+            logger.debug(f"Recieved Response from OpenAI: {response}")
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
@@ -87,8 +87,8 @@ class LiveStreamChatBot:
             tts_audio_path = self.generate_tts_audio(response)
             end_time = time.time()  # Add timestamp at the end
             step_time = end_time - start_time
-            print(f"Time taken for generating TTS audio: {step_time} seconds")
-            print("Playing TTS Audio")
+            logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+            logger.debug("Playing TTS Audio")
             self.play_audio_file(tts_audio_path)
 
             #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
@@ -96,7 +96,7 @@ class LiveStreamChatBot:
             # ADD TTS stuff here probably, you suck 
 
     def generate_tts_audio(self, text):
-        print("Generating TTS")
+        logger.debug("Generating TTS")
         # Initialize the Google Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
 
@@ -118,11 +118,11 @@ class LiveStreamChatBot:
         )
 
         # Save the TTS audio to a file
-        print(f"Saving TTS Return")
+        logger.debug(f"Saving TTS Return")
         tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
-        print(f"Saving TTS Return")
+        logger.debug(f"Saving TTS Return")
 
         #playsound(audio_file, winsound.SND_ASYNC)
 
@@ -149,7 +149,7 @@ class LiveStreamChatBot:
     def run(self):
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
-        print("Hopii is running.")
+        logger.info("Hopii is running.")
         try:
             while True:
                 self.process_messages()

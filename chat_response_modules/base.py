@@ -1,5 +1,5 @@
 from better_profanity import profanity
-
+from logger import logger
 
 class ChatBot:
     profanity.load_censor_words()

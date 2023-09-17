@@ -2,6 +2,7 @@ import queue
 import threading
 import time
 from googleapiclient.errors import HttpError
+from logger import logger
 
 class YouTubeChat:
 
@@ -41,13 +42,13 @@ class YouTubeChat:
                 polling_interval = messages_data.get('pollingIntervalMillis', 10000) / 1000 + 1
                 # Check if there's another page
                 self.next_page_token = messages_data.get('nextPageToken')
-                print(f"Next page token: {self.next_page_token}")
+                logger.debug(f"Next page token: {self.next_page_token}")
                 if not self.next_page_token or len(messages_data['items']) < max_results:
-                    print("No more pages")
+                    logger.debug("No more pages")
                     break
 
                 if not self.next_page_token:
-                    print("No next page token")
+                    logger.debug("No next page token")
                     break
 
                 time.sleep(polling_interval)
@@ -69,7 +70,7 @@ class YouTubeChat:
                     })
                     self.seen_messages.add(message_id)
         except HttpError as e:
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
             self.error_count += 1
 
     def run_chat(self):
@@ -78,11 +79,11 @@ class YouTubeChat:
                 self.fetch_messages()
                 time.sleep(60)
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logger.error(f"An error occurred: {e}")
                 self.error_count += 1
 
         if self.error_count >= self.MAX_ERRORS:
-            print("Max errors reached. Exiting scraper.")
+            logger.error("Max errors reached. Exiting scraper.")
             self.stop_event.set()
 
     def start_threaded(self):

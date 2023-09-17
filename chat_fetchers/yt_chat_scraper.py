@@ -11,7 +11,7 @@ from selenium.common.exceptions import TimeoutException, StaleElementReferenceEx
 import logging
 import threading
 import queue
-
+from logger import logger
 chromedriver_autoinstaller.install()
 
 logging.basicConfig(level=logging.INFO)
@@ -86,7 +86,7 @@ class YoutubeChatScraper:
     def __init__(self, live_id, bot_display_name, driver_options=None):
         self.bot_display_name = bot_display_name
         self.url = f"https://www.youtube.com/live_chat?is_popout=1&v={live_id}"
-        print(self.url)
+        logger.info(f"Opening {self.url} in chrome")
         self.driver = self._initialize_driver(driver_options)
         self.seen_messages = set()
         self.message_queue = queue.Queue()
@@ -137,7 +137,7 @@ class YoutubeChatScraper:
             error_messages = ["Access Blocked", "Error 404", "Not Found", "Forbidden"]
             for message in error_messages:
                 if self.driver.find_element(By.XPATH, f"//div[text()='{message}']"):
-                    print(f"Error detected on page: {message}")
+                    logger.error(f"Error detected on page: {message}")
                     return True
         except NoSuchElementException:
             pass
@@ -145,19 +145,19 @@ class YoutubeChatScraper:
 
 
     def start(self):
-        print(f"Starting to scrape chat messages from {self.url}")
+        logger.info(f"Starting to scrape chat messages from {self.url}")
         self.driver.get(self.url)
         self.actions = ActionChains(self.driver)
         time.sleep(2)
         self.original_title = self.driver.title
 
 
-        print("Locating Top chat dropdown...")
+        logger.debug("Locating Top chat dropdown...")
         try:
             dropdown_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[text()='Top chat']"))
             )
-            print("Found Top chat dropdown... Clicking...")
+            logger.debug("Found Top chat dropdown... Clicking...")
             self.actions.move_to_element(dropdown_button).perform()
             time.sleep(1)  # You can adjust this sleep if needed
             dropdown_button.click()
@@ -178,7 +178,7 @@ class YoutubeChatScraper:
 
         time.sleep(2)
 
-        print("Done waiting... loading chat...")
+        logger.debug("Done waiting... loading chat...")
         # This will wait until at least one chat message renderer is present
         WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "yt-live-chat-text-message-renderer"))
@@ -186,7 +186,7 @@ class YoutubeChatScraper:
 
     def get_chat_data(self):
         self.running = True
-        print("Getting chat data...")
+        logger.debug("Getting chat data...")
         # Find all chat container elements
         chat_containers = self.driver.find_elements(By.CSS_SELECTOR, "yt-live-chat-text-message-renderer")
         if not chat_containers:
@@ -220,7 +220,7 @@ class YoutubeChatScraper:
                         'message': message
                     })
             except StaleElementReferenceException:
-                print("Stale element encountered...")
+                logger.warning("Stale element encountered...")
                 continue
         # # Print the extracted data
         # for item in new_messages:
@@ -248,16 +248,16 @@ class YoutubeChatScraper:
             try:
                 self.get_chat_data()
             except Exception as e:
-                logging.error(f"Error while getting chat data: {e}")
+                logger.error(f"Error while getting chat data: {e}")
                 self.error_count += 1
 
                 if self.error_count >= self.MAX_ERRORS and not self.restart_attempt:
-                    logging.error("Max errors reached. Restarting scraper...")
+                    logger.error("Max errors reached. Restarting scraper...")
                     self.restart()
 
                 # After restarting, if there are still errors, exit
                 if self.error_count >= self.MAX_ERRORS and self.restart_attempt:
-                    logging.error("Max errors reached after restart. Exiting scraper.")
+                    logger.error("Max errors reached after restart. Exiting scraper.")
                     self.stop_event.set()
 
 
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         scraper.start_threaded()
         while True:
             message = scraper.message_queue.get()  # Blocking call, will wait until a new message is available
-            print(f"Author: {message['author']}, Timestamp: {message['timestamp']}, Message: {message['message']}")
+            logger.info(f"Author: {message['author']}, Timestamp: {message['timestamp']}, Message: {message['message']}")
     except KeyboardInterrupt:
         scraper.stop()
     except Exception as e:

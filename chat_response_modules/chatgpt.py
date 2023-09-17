@@ -1,5 +1,6 @@
 import openai
 from .base import ChatBot
+from logger import logger
 
 class ChatGPT(ChatBot):
 
@@ -22,7 +23,7 @@ class ChatGPT(ChatBot):
         # Add the most recent chat message
         messages.append({"role": "user", "content": f"{chat_message}"})
 
-        print(f"Sending messages to OpenAI: {messages}")
+        logger.debug(f"Sending messages to OpenAI: {messages}")
 
         response = openai.ChatCompletion.create(
             model="gpt-4",  # Use the chat-based model

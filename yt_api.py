@@ -1,24 +1,9 @@
-import googleapiclient.discovery
-import googleapiclient.errors
-import time
-import json
-import os
-import google_auth_oauthlib.flow
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-import pprint
-from google.auth.transport.requests import Request
 from oauth2client.client import flow_from_clientsecrets, AccessTokenCredentials
 from oauth2client.file import Storage
 from oauth2client.tools import run_flow
-import queue
-import threading
-import logging
-import queue
-import threading
-import time
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+
+from logger import logger
 
 class YouTubeClient:
     def __init__(self, channel_id):
@@ -47,7 +32,7 @@ class YouTubeClient:
         response = request.execute()
 
         if len(response['items']) == 0:
-            print("No active live streams found.")
+            logger.error("No active live streams found.")
             return None
         if response['items'][0]['status']['lifeCycleStatus'] != 'live':
             return None
@@ -58,7 +43,7 @@ class YouTubeClient:
         response = request.execute()
 
         if len(response['items']) == 0:
-            print("No active live streams found.")
+            logger.error("No active live streams found.")
             return None
         if response['items'][0]['status']['lifeCycleStatus'] != 'live':
             return None
@@ -93,4 +78,4 @@ if __name__ == '__main__':
     from config import *
     yt = YouTubeClient(channel_id)
     live_chat_id = yt.get_live_chat_id()
-    print(live_chat_id)
+    logger.info(live_chat_id)
