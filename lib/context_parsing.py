@@ -96,7 +96,7 @@ class Message:
 
     @property
     def sentiment(self):
-        return self.blob.sentiment
+        return self.blob.sentiment.polarity
 
     def clean_text(self, text):
         return ''.join(ch for ch in text if ch not in string.punctuation).lower().strip()
@@ -104,6 +104,15 @@ class Message:
     def __repr__(self):
         return f"Message(text='{self.text}')"
 
+    def get_properties(self):
+        properties_dict = {}
+        # Iterate through each attribute of the object
+        for name, attribute in self.__class__.__dict__.items():
+            # Check if the attribute name doesn't start with an underscore
+            if not name.startswith("_") and isinstance(attribute, property):
+                value = getattr(self, name)
+                properties_dict[name] = value
+        return properties_dict
 
 class ContextParser:
     MODEL_NAME = "en_core_web_sm"
@@ -153,9 +162,39 @@ class ContextParser:
         previous_entities = {ent.text for msg in self.message_history for ent in msg.doc.ents}
         return bool(current_entities & previous_entities)
 
+    def is_reply(self, new_message):
+        # If the message history is empty, it's not a reply
+        if not self.message_history:
+            return False
+
+        # Temporal Proximity (for this, we'll consider a time window of 5 minutes)
+        time_window = datetime.timedelta(seconds=30)
+        if new_message.timestamp - self.message_history[-1].timestamp <= time_window:
+            logger.verbose(f"Message '{new_message.text}' is likely a reply as it was sent within {time_window} of the previous message.")
+            return True
+
+        # Named Entity Matching
+        current_entities = set(new_message.named_entities)
+        previous_entities = {ent.text for msg in self.message_history for ent in msg.doc.ents}
+        if current_entities & previous_entities:
+            return True
+
+        # Levenshtein Similarity (we'll consider a similarity threshold of 0.6 for replies)
+        for previous_message in self.message_history:
+            if self.is_similar(new_message.text, previous_message.text, threshold=0.6):
+                return True
+
+        # Dependency Matching - checking for unresolved pronouns
+        pronouns = ["it", "he", "she", "they"]
+        if any(token.text.lower() in pronouns for token in new_message.doc):
+            return True
+
+        return False
+
     def is_relevant(self, message, bot_name="bot_username"):
         """Check if the text is relevant to the conversation."""
         message = Message(message, self.nlp)
+        logger.verbose(f"Message properties: {message.get_properties()}")
         self.add_to_history(message)
 
         if message.is_greeting:
@@ -172,6 +211,10 @@ class ContextParser:
 
         if message.is_short_message:
             logger.verbose(f"Message is too short.")
+            return False
+
+        if self.is_reply(message):
+            logger.verbose(f"Message is a reply.")
             return False
 
         if self.has_named_entities(message):

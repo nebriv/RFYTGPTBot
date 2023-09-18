@@ -64,6 +64,8 @@ def random_interactions(driver, delay=2.0):
             actions.perform()
     except MoveTargetOutOfBoundsException:
         logging.warning("MoveTargetOutOfBoundsException while performing random interactions.")
+    except Exception as err:
+        logging.warning(f"Exception while performing random interactions: {err}", exc_info=True)
 
 def scroll_to_bottom(driver):
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -279,7 +281,8 @@ class YoutubeChatScraper:
             logger.info("Signaled stop_event, setting running=False.")
             time.sleep(5)
             try:
-                self.driver.close()
+                if hasattr(self, 'driver') and self.driver:
+                    self.driver.close()
             except Exception as e:
                 logger.warning(f"Error while closing driver: {e}", exc_info=True)
             # Check if thread is alive and wait for it to finish

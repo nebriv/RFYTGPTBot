@@ -7,7 +7,7 @@ from lib.logger import logger
 class YouTubeChat:
 
     def __init__(self, youtube_client, bot_display_name):
-        logger.info("Initializing YouTubeChat API")
+        logger.info("Setting up YouTubeChat API")
         self.bot_display_name = bot_display_name
         self.live_chat_id = None
         self.next_page_token = None
@@ -23,7 +23,7 @@ class YouTubeChat:
         self.stop_event = threading.Event()
         self.error_count = 0
         self.MAX_ERRORS = 5
-        self.running = True
+        self.running = False
 
     def fetch_messages(self):
         logger.verbose("Fetching messages from YouTube API")
@@ -79,6 +79,7 @@ class YouTubeChat:
             self.error_count += 1
 
     def run_chat(self):
+        self.running = True
         while not self.stop_event.is_set() and self.error_count < self.MAX_ERRORS:
             try:
                 self.fetch_messages()

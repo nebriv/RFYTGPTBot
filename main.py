@@ -384,6 +384,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
-    # bot.manual = False
-    # bot.replay_file = "chat_logs/20230918_110939.json"
+    # bot.manual = True
+    # bot.replay_file = "chat_logs/20230918_143330.json"
     bot.run()
