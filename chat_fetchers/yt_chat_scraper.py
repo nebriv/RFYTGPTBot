@@ -102,7 +102,7 @@ class YoutubeChatScraper:
             driver_options = webdriver.ChromeOptions()
             # Adding argument to disable the AutomationControlled flag
             driver_options.add_argument("--disable-blink-features=AutomationControlled")
-
+            driver_options.add_argument('ignore-certificate-errors')
             # Exclude the collection of enable-automation switches
             driver_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             driver_options.add_argument("--window-size=383,600")
