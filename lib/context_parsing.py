@@ -15,7 +15,10 @@ class Message:
         self.author = message['author']
         self._nlp = nlp
         if type(message['timestamp']) == str:
-            self.timestamp = datetime.datetime.strptime(message['timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            if message['timestamp'].endswith('Z'):
+                self.timestamp = datetime.datetime.strptime(message['timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            else:
+                self.timestamp = datetime.datetime.strptime(message['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
         else:
             self.timestamp = message['timestamp']
         self._tokens = None
