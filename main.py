@@ -235,11 +235,14 @@ class LiveStreamChatBot:
             if message == "":  # Ignore empty messages
                 continue
 
-            relevant = self.context_parser.is_relevant(raw_output)
-            logger.verbose(f"Message relevant: {relevant}")
-            if not relevant:
-                continue
-
+            relevant = True
+            try:
+                relevant = self.context_parser.is_relevant(raw_output)
+                logger.verbose(f"Message relevant: {relevant}")
+                if not relevant:
+                    continue
+            except Exception as e:
+                logger.error(f"Error while checking relevance of message: {e}", exc_info=True)
 
             formatted_message = f"From: {author}, {message}"
             response = "Oops! I've momentarily slipped into another dimension. Let's realign our cosmic frequencies and try that again."
