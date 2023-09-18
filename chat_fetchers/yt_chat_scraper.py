@@ -86,8 +86,6 @@ class YoutubeChatScraper:
     def __init__(self, live_id, bot_display_name, driver_options=None):
         self.bot_display_name = bot_display_name
         self.url = f"https://www.youtube.com/live_chat?is_popout=1&v={live_id}"
-        logger.info(f"Opening {self.url} in chrome")
-        self.driver = self._initialize_driver(driver_options)
         self.seen_messages = set()
         self.message_queue = queue.Queue()
         self.stop_event = threading.Event()
@@ -144,7 +142,10 @@ class YoutubeChatScraper:
         return False
 
 
-    def start(self):
+    def start(self, driver_options=None):
+        logger.info(f"Opening {self.url} in chrome")
+
+        self.driver = self._initialize_driver(driver_options)
         logger.info(f"Starting to scrape chat messages from {self.url}")
         self.driver.get(self.url)
         self.actions = ActionChains(self.driver)
@@ -279,17 +280,19 @@ class YoutubeChatScraper:
 
             # Give scraper some time to stop
             time.sleep(10)
-            logger.info("Woke up from sleep.")
+            logger.verbose("Woke up from sleep.")
 
             # Check if thread is alive and wait for it to finish
-            if self.scraper_thread.is_alive():
-                logger.info("Thread is still alive, attempting to join...")
-                self.scraper_thread.join(timeout=10)
-                logger.info("Joined thread.")
+            if hasattr(self, 'scraper_thread') and self.scraper_thread:
+                if self.scraper_thread.is_alive():
+                    logger.info("Thread is still alive, attempting to join...")
+                    self.scraper_thread.join(timeout=10)
+                    logger.info("Joined thread.")
 
             # Quit the driver
-            logger.info("Attempting to quit the driver.")
-            self.driver.quit()
+            if hasattr(self, 'driver') and self.driver:
+                logger.info("Attempting to quit the driver.")
+                self.driver.quit()
             logger.info("Successfully quit the driver.")
         except Exception as e:
             logger.error(f"An error occurred while stopping: {str(e)}", exc_info=True)

@@ -94,4 +94,5 @@ class YouTubeChat:
 
     def stop(self):
         self.stop_event.set()
-        self.api_thread.join()  # Wait for the thread to finish
+        if hasattr(self, 'api_thread') and self.api_thread:
+            self.api_thread.join()  # Wait for the thread to finish

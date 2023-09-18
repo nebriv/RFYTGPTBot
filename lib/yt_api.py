@@ -21,7 +21,7 @@ class YouTubeClient:
             creds = None
 
         # If there are no (valid) credentials available, prompt the user to log in
-        if not creds or not creds.valid:
+        if not creds or not creds.valid or not creds.refresh_token:
             flow = InstalledAppFlow.from_client_secrets_file(client_secrets_file, scopes)
 
             # Explicitly request offline access

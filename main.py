@@ -17,9 +17,14 @@ import json
 from datetime import datetime
 import importlib
 from lib.context_parsing import ContextParser
+import logging
+from lib.utils import cleanup_folder, InputManager
+
 prompt_prefix = prompt_config.prompt_prefix
 
 ContextParser.install_spacy_model()
+
+disable_tts = True
 
 class LiveStreamChatBot:
     def __init__(self, channel_id):
@@ -33,18 +38,14 @@ class LiveStreamChatBot:
         self.youtube_chat = None
         self.chat_scraper = None
 
-        # if YouTubeChat:
-        #     self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
-        #     time.sleep(2)
-        #     self.youtube_chat.start_threaded()
-        #     time.sleep(2)
+        if YouTubeChat:
+            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
 
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
-            self.chat_scraper.start_threaded()
 
-        logger.info("Letting chat gather for 30 seconds")
-        time.sleep(30)
+        self.replay_file = None
+        self.manual = False
 
         self.bot = ChatGPT()
         self.context_parser = ContextParser()
@@ -79,27 +80,72 @@ class LiveStreamChatBot:
     def setup(self):
         if not os.path.exists('chat_logs'):
             os.makedirs('chat_logs')
-
+        cleanup_folder('chat_logs', 10)
         # Generate the filename based on the current date and time
         current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.output_file_path = f"chat_logs/{current_datetime_str}.json"
 
     def refresh_prompt(self):
         while not self.stop_running:
-            time.sleep(self.prompt_refresh_interval)
+            for _ in range(self.prompt_refresh_interval):
+                if self.stop_running:
+                    return
+                time.sleep(1)
             logger.info("Refreshing prompt")
             importlib.reload(prompt_config)
             self.bot.prompt_prefix = prompt_config.prompt_prefix
 
-    def fetch_messages(self, chat_log_file=None):
+    def manual_message_callback(self, message_data):
+        self.message_queue.put(message_data)
+
+    # def manual_message_prompt(self):
+    #     """Manually prompt for a message to send."""
+    #     current_level = logging.getLogger().getEffectiveLevel()
+    #     logging.getLogger().setLevel(logging.CRITICAL)
+    #     author = input("Enter author name (Bob): ")
+    #     if not author:
+    #         author = "Bob"
+    #     message = input("Enter message to send: ")
+    #     logging.getLogger().setLevel(current_level)
+    #     self.message_queue.put({"author": author, "message": message, "timestamp": datetime.utcnow().isoformat() + 'Z'})
+
+    def fetch_messages(self):
+
         logger.info("Fetching Messages")
 
-        if chat_log_file:
-            with open(chat_log_file, 'r') as f:
-                chat_log = json.load(f)
+        if self.manual:
+            input_manager = InputManager(self.manual_message_callback, self.stop_running)
+            try:
+                input_manager.start()
+                while not self.stop_running:
+                    # Here we're simply waiting for the stop signal
+                    pass
+            except UnicodeDecodeError:
+                logger.verbose("Caught UnicodeDecodeError. Skipping message")
+            except SystemExit:
+                pass
+            except Exception as e:
+                logger.error(f"Caught exception handling manual input:\n{str(e)}", exc_info=True)
+            finally:
+                input_manager.stop()  # Make sure to stop the input manager
+
+            logger.verbose("End of manual loop.")
+            return
+
+        logger.debug("Not manual mode.")
+        if self.replay_file:
+            logger.debug(f"Replay file specified, loading {self.replay_file}")
+            if os.path.exists(self.replay_file):
+                with open(self.replay_file, 'r') as f:
+                    chat_log = json.load(f)
+            else:
+                logger.error(f"Replay file {self.replay_file} does not exist.")
+                return
 
             prev_timestamp = None
             for entry in chat_log:
+                if self.stop_running:
+                    break
                 if prev_timestamp:
                     # Calculate delay based on the difference in timestamps
                     time_diff = datetime.fromisoformat(entry['timestamp']) - datetime.fromisoformat(prev_timestamp)
@@ -155,7 +201,10 @@ class LiveStreamChatBot:
     def batched_file_writer(self, interval=30):
         """Repeatedly save messages to the file in batches every `interval` seconds."""
         while not self.stop_running:
-            time.sleep(interval)
+            for _ in range(interval):
+                if self.stop_running:
+                    return
+                time.sleep(1)
             try:
                 self.save_messages_to_file()
             except Exception as e:
@@ -172,8 +221,13 @@ class LiveStreamChatBot:
             timestamp = raw_output['timestamp']
             message = raw_output['message']
 
+            if message == "":  # Ignore empty messages
+                continue
 
-            logger.verbose(f"Message relevant: {self.context_parser.is_relevant(message)}")
+            relevant = self.context_parser.is_relevant(raw_output)
+            logger.verbose(f"Message relevant: {relevant}")
+            if not relevant:
+                continue
 
 
             formatted_message = f"From: {author}, {message}"
@@ -183,7 +237,7 @@ class LiveStreamChatBot:
             except Exception as e:
                 logger.error(f"Error while getting response from OpenAI: {e}", exc_info=True)
 
-            self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response})
+            self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response, "relevant": relevant})
             logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
             logger.debug(f"Recieved Response from OpenAI: {response}")
 
@@ -191,19 +245,20 @@ class LiveStreamChatBot:
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
-            # Generate TTS audio from the response and give it to a file
-            start_time = time.time()
-            try:
-                tts_audio_path = self.generate_tts_audio(response)
-            except Exception as e:
-                logger.error(f"Error while generating TTS audio: {e}", exc_info=True)
-                continue
-            end_time = time.time()  # Add timestamp at the end
-            step_time = end_time - start_time
-            logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
-            logger.debug("Playing TTS Audio")
-            self.play_audio_file(tts_audio_path)
-            os.remove(tts_audio_path)
+            if not disable_tts:
+                # Generate TTS audio from the response and give it to a file
+                start_time = time.time()
+                try:
+                    tts_audio_path = self.generate_tts_audio(response)
+                except Exception as e:
+                    logger.error(f"Error while generating TTS audio: {e}", exc_info=True)
+                    continue
+                end_time = time.time()  # Add timestamp at the end
+                step_time = end_time - start_time
+                logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+                logger.debug("Playing TTS Audio")
+                self.play_audio_file(tts_audio_path)
+                os.remove(tts_audio_path)
 
             #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
@@ -260,7 +315,18 @@ class LiveStreamChatBot:
         # Block execution until audio is finished playing
         sd.wait()
 
+
     def run(self):
+
+        if not self.manual and not self.replay_file:
+            logger.info("Not manual and not chat replay, starting chat scraper and youtube chat.")
+            if self.youtube_chat:
+                self.youtube_chat.start_threaded()
+            if self.chat_scraper:
+                self.chat_scraper.start_threaded()
+            logger.info("Letting chat gather for 30 seconds")
+            time.sleep(30)
+
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
@@ -276,11 +342,16 @@ class LiveStreamChatBot:
             time.sleep(1)
             self.stop_running = True
             if self.chat_scraper:
+                logger.verbose("Stopping chat scraper.")
                 self.chat_scraper.stop()
             if self.youtube_chat:
+                logger.verbose("Stopping youtube chat.")
                 self.youtube_chat.stop()
+            logger.verbose("Waiting for file writer thread to join.")
             self.file_writer_thread.join()
+            logger.verbose("Waiting for fetch thread to join.")
             self.fetch_thread.join()
+            logger.verbose("Waiting for refresh prompt thread to join.")
             self.refresh_prompt_thread.join()
             logger.info("Hopii has shut down.")
             exit()
@@ -289,4 +360,5 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
+    bot.manual = True
     bot.run()
