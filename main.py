@@ -141,7 +141,9 @@ class LiveStreamChatBot:
                     chat_log = json.load(f)
             else:
                 logger.error(f"Replay file {self.replay_file} does not exist.")
-                return
+                self.stop_running = True
+                raise ValueError(f"Replay file {self.replay_file} does not exist.")
+
 
             prev_timestamp = None
             for entry in chat_log:
@@ -345,33 +347,43 @@ class LiveStreamChatBot:
         self.refresh_prompt_thread.start()
         logger.info("Hopii is running.")
         try:
-            while True:
+            while not self.stop_running:
                 self.process_messages()
                 time.sleep(1)  # Wait 1 seconds between responding to messages
         except KeyboardInterrupt:  # Graceful shutdown
-            logger.info("Shutting down Hopii.")
-            self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
-            time.sleep(1)
-            self.stop_running = True
-            if self.chat_scraper:
-                logger.verbose("Stopping chat scraper.")
-                self.chat_scraper.stop()
-            if self.youtube_chat:
-                logger.verbose("Stopping youtube chat.")
-                self.youtube_chat.stop()
+            self.shutdown()
+
+    def shutdown(self):
+        logger.info("Shutting down Hopii.")
+        self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
+        time.sleep(1)
+        self.stop_running = True
+        if self.chat_scraper:
+            logger.verbose("Stopping chat scraper.")
+            self.chat_scraper.stop()
+        if self.youtube_chat:
+            logger.verbose("Stopping youtube chat.")
+            self.youtube_chat.stop()
+        current_thread = threading.current_thread()
+
+        if current_thread != self.file_writer_thread:
             logger.verbose("Waiting for file writer thread to join.")
             self.file_writer_thread.join()
+
+        if current_thread != self.fetch_thread:
             logger.verbose("Waiting for fetch thread to join.")
             self.fetch_thread.join()
+
+        if current_thread != self.refresh_prompt_thread:
             logger.verbose("Waiting for refresh prompt thread to join.")
             self.refresh_prompt_thread.join()
-            logger.info("Hopii has shut down.")
-            exit()
+        logger.info("Hopii has shut down.")
+        exit()
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
-    bot.manual = False
-    bot.replay_file = "chat_logs/20230918_110939.json"
+    # bot.manual = False
+    # bot.replay_file = "chat_logs/20230918_110939.json"
     bot.run()

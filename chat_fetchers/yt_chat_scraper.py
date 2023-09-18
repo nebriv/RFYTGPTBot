@@ -277,13 +277,17 @@ class YoutubeChatScraper:
             self.stop_event.set()
             self.running = False
             logger.info("Signaled stop_event, setting running=False.")
-
+            time.sleep(5)
+            try:
+                self.driver.close()
+            except Exception as e:
+                logger.warning(f"Error while closing driver: {e}", exc_info=True)
             # Check if thread is alive and wait for it to finish
             if hasattr(self, 'scraper_thread') and self.scraper_thread:
                 if self.scraper_thread.is_alive():
                     # Give scraper some time to stop
-                    logger.verbose("Thread is still alive, sleeping for 10 seconds... to wait for it close out")
-                    time.sleep(10)
+                    logger.verbose("Thread is still alive, sleeping for 5 seconds... to wait for it close out")
+                    time.sleep(5)
                     logger.verbose("Done sleeping.")
                     logger.info("Thread is still alive, attempting to join...")
                     self.scraper_thread.join(timeout=10)
@@ -292,6 +296,7 @@ class YoutubeChatScraper:
             # Quit the driver
             if hasattr(self, 'driver') and self.driver:
                 logger.info("Attempting to quit the driver.")
+
                 self.driver.quit()
             logger.info("Successfully quit the driver.")
         except Exception as e:
