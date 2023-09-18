@@ -19,6 +19,8 @@ import importlib
 from lib.context_parsing import ContextParser
 prompt_prefix = prompt_config.prompt_prefix
 
+ContextParser.install_spacy_model()
+
 class LiveStreamChatBot:
     def __init__(self, channel_id):
         logger.info("Starting LiveStreamChatBot")
@@ -31,11 +33,11 @@ class LiveStreamChatBot:
         self.youtube_chat = None
         self.chat_scraper = None
 
-        if YouTubeChat:
-            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
-            time.sleep(2)
-            self.youtube_chat.start_threaded()
-            time.sleep(2)
+        # if YouTubeChat:
+        #     self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+        #     time.sleep(2)
+        #     self.youtube_chat.start_threaded()
+        #     time.sleep(2)
 
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
@@ -45,6 +47,7 @@ class LiveStreamChatBot:
         time.sleep(30)
 
         self.bot = ChatGPT()
+        self.context_parser = ContextParser()
 
         self.bot.setup(openai_key, prompt_prefix=prompt_prefix)
         self.message_queue = queue.Queue()
@@ -161,13 +164,16 @@ class LiveStreamChatBot:
 
     def process_messages(self):
         while not self.message_queue.empty() and not self.stop_running:
+
             raw_output = self.message_queue.get()
+            logger.verbose(f"Processing message: {raw_output}")
 
             author = raw_output['author']
             timestamp = raw_output['timestamp']
             message = raw_output['message']
 
 
+            logger.verbose(f"Message relevant: {self.context_parser.is_relevant(message)}")
 
 
             formatted_message = f"From: {author}, {message}"
@@ -267,6 +273,7 @@ class LiveStreamChatBot:
         except KeyboardInterrupt:  # Graceful shutdown
             logger.info("Shutting down Hopii.")
             self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
+            time.sleep(1)
             self.stop_running = True
             if self.chat_scraper:
                 self.chat_scraper.stop()

@@ -187,7 +187,7 @@ class YoutubeChatScraper:
 
     def get_chat_data(self):
         self.running = True
-        logger.verbose("Getting chat data...")
+        logger.debug("Getting chat data...")
         # Find all chat container elements
         chat_containers = self.driver.find_elements(By.CSS_SELECTOR, "yt-live-chat-text-message-renderer")
         if not chat_containers:
@@ -249,6 +249,8 @@ class YoutubeChatScraper:
             try:
                 self.get_chat_data()
             except Exception as e:
+                if "urllib3.exceptions.NewConnectionError" in str(e) or "urllib3.exceptions.MaxRetryError" in str(e):
+                    break
                 logger.error(f"Error while getting chat data: {e}", exc_info=True)
                 if self.stop_event.is_set():
                     break
@@ -270,11 +272,27 @@ class YoutubeChatScraper:
 
 
     def stop(self):
-        self.stop_event.set()
-        self.driver.quit()
-        self.scraper_thread.join()  # Wait for the thread to finish
-        self.running = False
+        try:
+            self.stop_event.set()
+            self.running = False
+            logger.info("Signaled stop_event, setting running=False.")
 
+            # Give scraper some time to stop
+            time.sleep(10)
+            logger.info("Woke up from sleep.")
+
+            # Check if thread is alive and wait for it to finish
+            if self.scraper_thread.is_alive():
+                logger.info("Thread is still alive, attempting to join...")
+                self.scraper_thread.join(timeout=10)
+                logger.info("Joined thread.")
+
+            # Quit the driver
+            logger.info("Attempting to quit the driver.")
+            self.driver.quit()
+            logger.info("Successfully quit the driver.")
+        except Exception as e:
+            logger.error(f"An error occurred while stopping: {str(e)}", exc_info=True)
 
     def restart(self):
         if not self.restart_attempt:
