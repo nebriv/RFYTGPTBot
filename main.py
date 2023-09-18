@@ -152,7 +152,8 @@ class LiveStreamChatBot:
                     time_diff = datetime.fromisoformat(entry['timestamp'].rstrip('Z')) - datetime.fromisoformat(prev_timestamp.rstrip('Z'))
 
                     delay = time_diff.total_seconds()
-                    for _ in range(delay):
+                    logger.debug(f"Delaying for {delay} seconds to simulate real time.")
+                    for _ in range(int(delay)):
                         if self.stop_running:
                             return
                         time.sleep(1)

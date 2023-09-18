@@ -278,8 +278,6 @@ class YoutubeChatScraper:
             self.running = False
             logger.info("Signaled stop_event, setting running=False.")
 
-
-
             # Check if thread is alive and wait for it to finish
             if hasattr(self, 'scraper_thread') and self.scraper_thread:
                 if self.scraper_thread.is_alive():
