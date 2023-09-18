@@ -4,7 +4,7 @@ import time
 import queue
 import threading
 import os
-from config import openai_key, channel_id, bot_display_name, output_device
+from config import *
 from google.cloud import texttospeech_v1beta1 as texttospeech
 import sounddevice as sd
 import soundfile as sf
@@ -74,7 +74,7 @@ class LiveStreamChatBot:
         self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(30,))
         self.refresh_prompt_thread = threading.Thread(target=self.refresh_prompt)
         self.message_log = queue.Queue()
-
+        self.disable_chat_save = False
         self.setup()
 
     def setup(self):
@@ -134,6 +134,7 @@ class LiveStreamChatBot:
 
         logger.debug("Not manual mode.")
         if self.replay_file:
+            self.disable_chat_save = True # Disable chat saving if we're replaying a file
             logger.debug(f"Replay file specified, loading {self.replay_file}")
             if os.path.exists(self.replay_file):
                 with open(self.replay_file, 'r') as f:
@@ -148,9 +149,13 @@ class LiveStreamChatBot:
                     break
                 if prev_timestamp:
                     # Calculate delay based on the difference in timestamps
-                    time_diff = datetime.fromisoformat(entry['timestamp']) - datetime.fromisoformat(prev_timestamp)
+                    time_diff = datetime.fromisoformat(entry['timestamp'].rstrip('Z')) - datetime.fromisoformat(prev_timestamp.rstrip('Z'))
+
                     delay = time_diff.total_seconds()
-                    time.sleep(delay)  # sleep for the difference in timestamps
+                    for _ in range(delay):
+                        if self.stop_running:
+                            return
+                        time.sleep(1)
                 self.message_queue.put({
                     "author": entry['author'],
                     "timestamp": entry['timestamp'],
@@ -180,6 +185,9 @@ class LiveStreamChatBot:
 
     def save_messages_to_file(self):
         """Save all messages from the queue to the file."""
+        if self.disable_chat_save:
+            logger.warning("Chat saving disabled (likely due to chat replay).")
+            return
         try:
             with open(self.output_file_path, 'r') as f:
                 messages = json.load(f)
@@ -325,7 +333,10 @@ class LiveStreamChatBot:
             if self.chat_scraper:
                 self.chat_scraper.start_threaded()
             logger.info("Letting chat gather for 30 seconds")
-            time.sleep(30)
+            for _ in range(30):
+                if self.stop_running:
+                    return
+                time.sleep(1)
 
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
@@ -360,5 +371,6 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
-    bot.manual = True
+    bot.manual = False
+    bot.replay_file = "chat_logs/20230918_110939.json"
     bot.run()

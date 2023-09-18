@@ -278,13 +278,15 @@ class YoutubeChatScraper:
             self.running = False
             logger.info("Signaled stop_event, setting running=False.")
 
-            # Give scraper some time to stop
-            time.sleep(10)
-            logger.verbose("Woke up from sleep.")
+
 
             # Check if thread is alive and wait for it to finish
             if hasattr(self, 'scraper_thread') and self.scraper_thread:
                 if self.scraper_thread.is_alive():
+                    # Give scraper some time to stop
+                    logger.verbose("Thread is still alive, sleeping for 10 seconds... to wait for it close out")
+                    time.sleep(10)
+                    logger.verbose("Done sleeping.")
                     logger.info("Thread is still alive, attempting to join...")
                     self.scraper_thread.join(timeout=10)
                     logger.info("Joined thread.")

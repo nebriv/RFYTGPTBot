@@ -53,7 +53,10 @@ class YouTubeChat:
                     logger.debug("No next page token")
                     break
 
-                time.sleep(polling_interval)
+                for _ in range(polling_interval):
+                    if not self.running:
+                        return
+                    time.sleep(1)
 
             for chat_item in latest_messages:
                 message_id = chat_item['id']
@@ -79,7 +82,10 @@ class YouTubeChat:
         while not self.stop_event.is_set() and self.error_count < self.MAX_ERRORS:
             try:
                 self.fetch_messages()
-                time.sleep(60)
+                for _ in range(60):
+                    if not self.running or self.stop_event.is_set():
+                        return
+                    time.sleep(1)
             except Exception as e:
                 logger.error(f"An error occurred: {e}")
                 self.error_count += 1
