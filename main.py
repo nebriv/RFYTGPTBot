@@ -19,6 +19,7 @@ import importlib
 from lib.context_parsing import ContextParser
 import logging
 from lib.utils import cleanup_folder, InputManager
+from lib.speechtotext import SpeechToText  # Adjust the import path as needed
 
 prompt_prefix = prompt_config.prompt_prefix
 
@@ -78,6 +79,15 @@ class LiveStreamChatBot:
         self.message_log = queue.Queue()
         self.disable_chat_save = False
         self.setup()
+        
+        #SpeechToText
+        self.speech_to_text = SpeechToText()
+        self.speech_thread = threading.Thread(target=self.start_speech_recognition)
+
+    def start_speech_recognition(self):
+        while not self.stop_running:
+
+                self.speech_to_text.listen_microphone()
 
     def setup(self):
         if not os.path.exists('chat_logs'):
@@ -348,6 +358,7 @@ class LiveStreamChatBot:
         self.fetch_thread.start()
         self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
+        self.speech_thread.start()
         logger.info("Hopii is running.")
         try:
             while not self.stop_running:
