@@ -7,6 +7,8 @@ import Levenshtein
 import string
 from textblob import TextBlob
 import datetime
+from dateutil.parser import parse
+from dateutil.tz import gettz
 
 class Message:
     def __init__(self, message, nlp):
@@ -15,10 +17,7 @@ class Message:
         self.author = message['author']
         self._nlp = nlp
         if type(message['timestamp']) == str:
-            if message['timestamp'].endswith('Z'):
-                self.timestamp = datetime.datetime.strptime(message['timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")
-            else:
-                self.timestamp = datetime.datetime.strptime(message['timestamp'], "%Y-%m-%dT%H:%M:%S.%f")
+            self.timestamp = parse(message['timestamp'], ignoretz=True)
         else:
             self.timestamp = message['timestamp']
         self._tokens = None
@@ -150,7 +149,7 @@ class ContextParser:
 
     def greetings_in_history(self, limit=3, time_limit=datetime.timedelta(minutes=5)):
         """Count the number of greetings in the recent message history."""
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
 
         recent_greetings = 0
         for message in list(self.message_history)[-limit:]:
@@ -168,6 +167,9 @@ class ContextParser:
     def is_reply(self, new_message):
         # If the message history is empty, it's not a reply
         if not self.message_history:
+            return False
+
+        if not self.message_history or new_message.author == self.message_history[-1].author:
             return False
 
         # Temporal Proximity (for this, we'll consider a time window of 5 minutes)
@@ -212,7 +214,7 @@ class ContextParser:
                 logger.verbose(f"More than 2 greetings in the last 10 messages.")
                 return False
 
-        if message.is_short_message:
+        if message.is_short_message and not message.is_question:
             logger.verbose(f"Message is too short.")
             return False
 
@@ -222,7 +224,7 @@ class ContextParser:
 
         if self.has_named_entities(message):
             logger.verbose(f"Message contains named entities.")
-            return False
+            return True
 
         if message.is_question or message.subject:
             if message.is_question:
