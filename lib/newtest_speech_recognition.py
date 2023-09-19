@@ -1,17 +1,33 @@
 import speech_recognition as sr
 import threading
-from lib.logger import logger  # Assuming you have a logger configured
+from logger import logger  # Assuming you have a logger configured
 import pyaudio
 import keyboard
 
 class SpeechToText:
-    def __init__(self):
+    def __init__(self, desired_device=None):
         self.recognizer = sr.Recognizer()
         self.listening = False
         self.listen_thread = None
+        self.desired_device = desired_device
+        self.device_index = None
+
+        if self.desired_device:
+            p = pyaudio.PyAudio()
+            try:
+                for i in range(p.get_device_count()):
+                    device_info = p.get_device_info_by_index(i)
+                    if self.desired_device.lower() in device_info['name'].lower():
+                        self.device_index = i
+                        logger.info("Using input device: %s (Index: %d)", device_info['name'], self.device_index)
+                        break
+                else:
+                    logger.warning("Desired device '%s' not found. Using default microphone.", self.desired_device)
+            finally:
+                p.terminate()
 
     def listen_microphone(self):
-        with sr.Microphone() as source:  # Note that we're not setting device_index here
+        with sr.Microphone(device_index=self.device_index) as source:
             logger.info("Listening...")
             audio = None
             while self.listening:
@@ -31,6 +47,8 @@ class SpeechToText:
                     logger.info("Could not understand audio")
                 except sr.RequestError as e:
                     logger.error("Could not request results: %s", e)
+                with open("recorded_audio.wav", "wb") as f:
+                    f.write(audio.get_wav_data())
 
     def start_listening(self):
         if not self.listening:
@@ -44,8 +62,9 @@ class SpeechToText:
             self.listen_thread.join()
 
 def run_speech_to_text():
-    # Create an instance of the SpeechToText class
-    speech_to_text = SpeechToText()
+    # Create an instance of the SpeechToText class with the desired audio device
+    desired_device_name = "Razer BlackShark V2 Pro 2.4"
+    speech_to_text = SpeechToText(desired_device=desired_device_name)
 
     # Add hotkeys
     keyboard.add_hotkey('ctrl+shift+5', lambda: speech_to_text.start_listening())
