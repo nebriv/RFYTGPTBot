@@ -19,7 +19,7 @@ import importlib
 from lib.context_parsing import ContextParser
 import logging
 from lib.utils import cleanup_folder, InputManager
-from lib.speechtotext import SpeechToText  # Adjust the import path as needed
+from lib.speechtotext import SpeechToText
 
 prompt_prefix = prompt_config.prompt_prefix
 
