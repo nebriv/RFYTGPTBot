@@ -24,7 +24,7 @@ prompt_prefix = prompt_config.prompt_prefix
 
 ContextParser.install_spacy_model()
 
-disable_tts = True
+disable_tts = False
 
 class LiveStreamChatBot:
     def __init__(self, channel_id):

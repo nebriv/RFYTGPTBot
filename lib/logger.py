@@ -12,11 +12,11 @@ logging.Logger.verbose = verbose
 
 # Create a logger named 'myapp'
 logger = logging.getLogger('RFYTGPTBot')
-logger.setLevel(VERBOSE)  # Set level for your application
+logger.setLevel(logging.DEBUG)  # Set level for your application
 logger.propagate = False
 # Create a console handler and set level to debug
 ch = logging.StreamHandler()
-ch.setLevel(VERBOSE)  # Or whichever level you want
+ch.setLevel(logging.DEBUG)  # Or whichever level you want
 
 # Create formatter
 formatter = logging.Formatter('%(asctime)s - %(name)s (%(module)s.%(funcName)s) - %(levelname)s - %(message)s')
