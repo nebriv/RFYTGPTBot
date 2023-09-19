@@ -26,7 +26,7 @@ class ChatBot:
 
     def get_response_text(self, author, chat_message, chat_history=None):
         if profanity.contains_profanity(chat_message):
-            return "Please don't use profanity."
+            return "Hey Mods? Someone is using sentance sentence in chat."
         return self.respond_to(author, chat_message, chat_history)
 
     def respond_to(self, message, chat_history=None):
