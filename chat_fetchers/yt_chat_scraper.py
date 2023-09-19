@@ -5,13 +5,17 @@ import time
 import random
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException, MoveTargetOutOfBoundsException
 import logging
 import threading
 import queue
 from lib.logger import logger
+from dateutil import parser
+import pytz
+from dateutil.tz import tzlocal
+
 chromedriver_autoinstaller.install()
 
 logging.basicConfig(level=logging.INFO)
@@ -75,13 +79,29 @@ def convert_timestamp(ts):
     current_time = datetime.now(timezone.utc)
     hour, minute_ampm = ts.split()
     hour, minute = map(int, hour.split(":"))
+
     if "PM" in minute_ampm and hour != 12:
         hour += 12
     if "AM" in minute_ampm and hour == 12:
         hour = 0
+
+    # Adjust the day if needed
+    if hour > current_time.hour:
+        current_time -= timedelta(days=1)
+
     converted_time = current_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return converted_time.isoformat()
 
+
+def round_to_nearest_minute(dt):
+    # Convert datetime to timestamp
+    timestamp = dt.timestamp()
+
+    # Round to the nearest minute
+    rounded_timestamp = round(timestamp / 60) * 60
+
+    # Convert back to datetime
+    return datetime.fromtimestamp(rounded_timestamp)
 
 class YoutubeChatScraper:
 
@@ -96,6 +116,10 @@ class YoutubeChatScraper:
         self.error_count = 0
         self.MAX_ERRORS = 5
         self.restart_attempt = False
+
+        self.launch_time = datetime.now()
+
+        self.last_timestamp = None
 
     def _initialize_driver(self, driver_options=None):
         if driver_options is None:
@@ -198,11 +222,13 @@ class YoutubeChatScraper:
             return
 
         new_messages = []
+        chat_containers.reverse()
 
         for container in chat_containers:
             try:
                 message_id = container.get_attribute("id")
                 if message_id not in self.seen_messages:
+                    self.seen_messages.add(message_id)
                     author_name = self.driver.execute_script("return arguments[0].innerText;",
                                                         container.find_element(By.CSS_SELECTOR,
                                                                                "span#author-name")).strip()
@@ -210,9 +236,21 @@ class YoutubeChatScraper:
                                                                         container.find_element(By.CSS_SELECTOR,
                                                                                                "span#timestamp")).strip())
                     message = self.driver.execute_script("return arguments[0].innerText;",
-                                                    container.find_element(By.CSS_SELECTOR, "span#message")).strip()
+                                                         container.find_element(By.CSS_SELECTOR,
+                                                                                "span#message")).strip()
 
-                    self.seen_messages.add(message_id)
+                    logger.debug(f"Processing message from {author_name} at {timestamp}...")
+                    message_timestamp = parser.parse(timestamp, default=datetime(datetime.now().year, 1, 1, tzinfo=tzlocal())).replace(tzinfo=None)
+
+                    if round_to_nearest_minute(message_timestamp) >= round_to_nearest_minute(self.launch_time):
+                        # This is a new message after bot launch, process it
+                        logger.debug(
+                            f"Message from {author_name} at {message_timestamp} is after launch time {self.launch_time}. Adding to queue...")
+                    else:
+                        # This is an old message, skip it
+                        logger.debug(
+                            f"Message from {author_name} at {message_timestamp} is before launch time {self.launch_time}. Skipping...")
+                        continue
 
                     # print(f"SCRAPED: {message}")
                     if author_name == self.bot_display_name:
@@ -223,9 +261,13 @@ class YoutubeChatScraper:
                         'timestamp': timestamp,
                         'message': message
                     })
+                else:
+                    break
             except StaleElementReferenceException:
                 logger.warning("Stale element encountered...")
                 continue
+
+
         # # Print the extracted data
         # for item in new_messages:
         #     print(f"Author: {item['author']}, Timestamp: {item['timestamp']}, Message: {item['message']}")
