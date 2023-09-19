@@ -44,6 +44,8 @@ class LiveStreamChatBot:
         if YoutubeChatScraper:
             self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
 
+        self.chat_merger = ChatMerger(self.chat_scraper, self.youtube_chat)
+
         self.replay_file = None
         self.manual = False
 
@@ -164,27 +166,24 @@ class LiveStreamChatBot:
                     "timestamp": entry['timestamp'],
                     "message": entry['message']
                 })
-                self.all_messages_context.append({
-                    "author": entry['author'],
-                    "timestamp": entry['timestamp'],
-                    "message": entry['message']
-                })
+
                 prev_timestamp = entry['timestamp']
             return
 
+
         while not self.stop_running:
 
-            merger = ChatMerger(self.chat_scraper, self.youtube_chat)
-            messages = merger.get_unique_messages()
+
+            messages = self.chat_merger.get_unique_messages()
 
             if self.first_run:
                 self.all_messages_context = messages
                 self.first_run = False
+                self.chat_merger.seen_messages_hashes.clear()
             else:
                 for message in messages:
                     logger.debug(f"Recieved Message: {message}")
                     self.message_queue.put(message)
-                    self.all_messages_context.append(message)
 
     def save_messages_to_file(self):
         """Save all messages from the queue to the file."""
@@ -206,8 +205,9 @@ class LiveStreamChatBot:
         if counter > 0:
             logger.info(f"Saving {counter} messages to file.")
             # Write back to the file
+
             with open(self.output_file_path, 'w') as f:
-                json.dump(messages, f, indent=4)
+                json.dump(messages, f, indent=4, default=str)
 
     def batched_file_writer(self, interval=30):
         """Repeatedly save messages to the file in batches every `interval` seconds."""
@@ -255,7 +255,7 @@ class LiveStreamChatBot:
             logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
             logger.debug(f"Recieved Response from OpenAI: {response}")
 
-
+            self.all_messages_context.append(raw_output)
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
