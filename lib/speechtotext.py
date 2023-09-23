@@ -1,20 +1,24 @@
 import speech_recognition as sr
 import threading
 from lib.logger import logger  # Assuming you have a logger configured
-import pyaudio
 import keyboard
 
 class SpeechToText:
-    def __init__(self):
+    def __init__(self, bot):
+        self.bot = bot
         self.recognizer = sr.Recognizer()
         self.listening = False
+        self.stop_listening = False  # Shared variable to signal when to stop
         self.listen_thread = None
 
     def listen_microphone(self):
-        with sr.Microphone() as source:  # Note that we're not setting device_index here
+        with sr.Microphone() as source:
+            logger.info("Waiting for hotkey to start listening...")
+            keyboard.wait('ctrl+shift+5')  # Wait for the hotkey to start listening
             logger.info("Listening...")
-            audio = None
-            while self.listening:
+            self.listening = True
+
+            while not self.stop_listening:  # Continue listening until signaled to stop
                 try:
                     audio = self.recognizer.listen(source, timeout=2)  # Listen in 2-second chunks
                 except sr.WaitTimeoutError:
@@ -23,36 +27,25 @@ class SpeechToText:
                     logger.error("An error occurred: %s", e)
                     break
 
-            if audio:
-                try:
-                    text = self.recognizer.recognize_google(audio)
-                    logger.info("You said: %s", text)
-                except sr.UnknownValueError:
-                    logger.info("Could not understand audio")
-                except sr.RequestError as e:
-                    logger.error("Could not request results: %s", e)
+                if audio:
+                    try:
+                        text = self.recognizer.recognize_google(audio)
+                        logger.info("You said: %s", text)
+                        
+                        # Send the recognized text to OpenAI using your main script's functionality
+                        self.bot.send_message_to_openai("Rocket Future", text)
+                    except sr.UnknownValueError:
+                        logger.info("Could not understand audio")
+                    except sr.RequestError as e:
+                        logger.error("Could not request results: %s", e)
 
+            logger.info("Stopped listening.")
+            
     def start_listening(self):
         if not self.listening:
-            self.listening = True
+            self.stop_listening = False  # Reset the stop flag
             self.listen_thread = threading.Thread(target=self.listen_microphone)
             self.listen_thread.start()
 
     def stop_listening(self):
-        self.listening = False
-        if self.listen_thread:
-            self.listen_thread.join()
-
-def run_speech_to_text():
-    # Create an instance of the SpeechToText class
-    speech_to_text = SpeechToText()
-
-    # Add hotkeys
-    keyboard.add_hotkey('ctrl+shift+5', lambda: speech_to_text.start_listening())
-    keyboard.add_hotkey('ctrl+shift+0', lambda: speech_to_text.stop_listening())
-
-    # Start the keyboard listener
-    keyboard.wait()
-
-if __name__ == "__main__":
-    run_speech_to_text()
+        self.stop_listening = True  # Signal the thread to stop
