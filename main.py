@@ -254,7 +254,7 @@ class LiveStreamChatBot:
 
             # ADD TTS stuff here probably, you suck 
 
-    def generate_tts_audio(self, text):
+   def generate_tts_audio(self, text):
         logger.debug("Generating TTS")
         # Initialize the Google Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
@@ -276,13 +276,18 @@ class LiveStreamChatBot:
             input=input_text, voice=voice, audio_config=audio_config
         )
 
-        # Get the current script's directory
-        script_directory = os.path.dirname(os.path.abspath(__file__))
-
         # Save the TTS audio to a file
-        tts_audio_path = os.path.join(script_directory, "tts_audio.wav")
+        logger.debug(f"Saving TTS Return")
+        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
+        logger.debug(f"Saving TTS Return")
+
+        #playsound(audio_file, winsound.SND_ASYNC)
+
+        audio_file = os.path.join(os.path.dirname(__file__), tts_audio_path)
+        # media = vlc.MediaPlayer(audio_file)
+        # media.play()
 
         return tts_audio_path
 
@@ -299,6 +304,7 @@ class LiveStreamChatBot:
 
         # Block execution until audio is finished playing
         sd.wait()
+
 
 
     def run(self):
