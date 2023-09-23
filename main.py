@@ -36,9 +36,10 @@ class LiveStreamChatBot:
             logger.error(f"Channel {channel_id} is not currently live.")
             exit()
 
-        self.speech_to_text = SpeechToText(self)
         self.youtube_chat = None
         self.chat_scraper = None
+        self.speech_to_text = SpeechToText()
+        
 
         if YouTubeChat:
             self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
@@ -88,6 +89,26 @@ class LiveStreamChatBot:
         # Generate the filename based on the current date and time
         current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.output_file_path = f"chat_logs/{current_datetime_str}.json"
+    
+    def process_speech_to_text(self):
+        while not self.stop_running:
+            if self.speech_to_text.is_listening:
+                transcribed_text = self.speech_to_text.transcribed_text
+                if transcribed_text:
+                    # Process the transcribed text as if it were a message from YouTube chat
+                    self.process_transcribed_text(transcribed_text)
+    
+    def process_transcribed_text(self, transcribed_text):
+        #Process the transcribed text as needed, e.g., send it to GPT-3 for a response
+        # You can use self.bot or any other processing logic here
+        author = "Rocket Future"  # You can set a custom author for transcribed text
+        formatted_message = f"From: {author}, {transcribed_text}"
+    
+        # Send the transcribed text to GPT-3 or perform any other processing
+        response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
+    
+        # You can log or handle the response as needed
+        logger.info({"author": author, "message": transcribed_text, "response": response})
 
     def refresh_prompt(self):
         while not self.stop_running:
@@ -114,10 +135,31 @@ class LiveStreamChatBot:
     #     self.message_queue.put({"author": author, "message": message, "timestamp": datetime.utcnow().isoformat() + 'Z'})
 
     def fetch_messages(self):
+
         logger.info("Fetching Messages")
 
+        if self.manual:
+            input_manager = InputManager(self.manual_message_callback, self.stop_running)
+            try:
+                input_manager.start()
+                while not self.stop_running:
+                    # Here we're simply waiting for the stop signal
+                    pass
+            except UnicodeDecodeError:
+                logger.verbose("Caught UnicodeDecodeError. Skipping message")
+            except SystemExit:
+                pass
+            except Exception as e:
+                logger.error(f"Caught exception handling manual input:\n{str(e)}", exc_info=True)
+            finally:
+                input_manager.stop()  # Make sure to stop the input manager
+
+            logger.verbose("End of manual loop.")
+            return
+
+        logger.debug("Not manual mode.")
         if self.replay_file:
-            self.disable_chat_save = True
+            self.disable_chat_save = True # Disable chat saving if we're replaying a file
             logger.debug(f"Replay file specified, loading {self.replay_file}")
             if os.path.exists(self.replay_file):
                 with open(self.replay_file, 'r') as f:
@@ -126,6 +168,7 @@ class LiveStreamChatBot:
                 logger.error(f"Replay file {self.replay_file} does not exist.")
                 self.stop_running = True
                 raise ValueError(f"Replay file {self.replay_file} does not exist.")
+
 
             prev_timestamp = None
             for entry in chat_log:
@@ -136,7 +179,7 @@ class LiveStreamChatBot:
                     time_diff = datetime.fromisoformat(entry['timestamp'].rstrip('Z')) - datetime.fromisoformat(prev_timestamp.rstrip('Z'))
 
                     delay = time_diff.total_seconds()
-                    logger.debug(f"Delaying for {delay} seconds to simulate real-time.")
+                    logger.debug(f"Delaying for {delay} seconds to simulate real time.")
                     for _ in range(int(delay)):
                         if self.stop_running:
                             return
@@ -150,7 +193,10 @@ class LiveStreamChatBot:
                 prev_timestamp = entry['timestamp']
             return
 
+
         while not self.stop_running:
+
+
             messages = self.chat_merger.get_unique_messages()
 
             if self.first_run:
@@ -159,7 +205,7 @@ class LiveStreamChatBot:
                 self.chat_merger.seen_messages_hashes.clear()
             else:
                 for message in messages:
-                    logger.debug(f"Received Message: {message}")
+                    logger.debug(f"Recieved Message: {message}")
                     self.message_queue.put(message)
 
     def save_messages_to_file(self):
@@ -199,21 +245,22 @@ class LiveStreamChatBot:
                 logger.error(f"Error while saving messages to file: {e}", exc_info=True)
 
 
-    def process_messages(self, message_data):  # Accept message_data as an argument
+    def process_messages(self):
         while not self.message_queue.empty() and not self.stop_running:
+
             raw_output = self.message_queue.get()
             logger.verbose(f"Processing message: {raw_output}")
 
-            author = message_data['author']
-            timestamp = message_data['timestamp']
-            message = message_data['message']
+            author = raw_output['author']
+            timestamp = raw_output['timestamp']
+            message = raw_output['message']
 
             if message == "":  # Ignore empty messages
                 continue
 
             relevant = True
             try:
-                relevant = self.context_parser.is_relevant(message_data)  # Use message_data
+                relevant = self.context_parser.is_relevant(raw_output)
                 logger.verbose(f"Message relevant: {relevant}")
                 if not relevant:
                     continue
@@ -231,7 +278,7 @@ class LiveStreamChatBot:
             logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
             logger.debug(f"Recieved Response from OpenAI: {response}")
 
-            self.all_messages_context.append(message_data)  # Use message_data
+            self.all_messages_context.append(raw_output)
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
             self.all_messages_context = self.all_messages_context[-100:]
 
@@ -254,7 +301,7 @@ class LiveStreamChatBot:
 
             # ADD TTS stuff here probably, you suck 
 
-   def generate_tts_audio(self, text):
+    def generate_tts_audio(self, text):
         logger.debug("Generating TTS")
         # Initialize the Google Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
@@ -306,7 +353,6 @@ class LiveStreamChatBot:
         sd.wait()
 
 
-
     def run(self):
 
         if not self.manual and not self.replay_file:
@@ -321,12 +367,16 @@ class LiveStreamChatBot:
                     return
                 time.sleep(1)
 
-        self.speech_to_text.start_listening()
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
         logger.info("Hopii is running.")
+
+         # Start a thread to process speech-to-text
+        speech_thread = threading.Thread(target=self.process_speech_to_text)
+        speech_thread.start()
+
         try:
             while not self.stop_running:
                 self.process_messages()
@@ -334,6 +384,7 @@ class LiveStreamChatBot:
         except KeyboardInterrupt:  # Graceful shutdown
             self.shutdown()
 
+       
     def shutdown(self):
         logger.info("Shutting down Hopii.")
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
