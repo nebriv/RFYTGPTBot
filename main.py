@@ -36,6 +36,7 @@ class LiveStreamChatBot:
             logger.error(f"Channel {channel_id} is not currently live.")
             exit()
 
+        self.speech_to_text = SpeechToText(self)
         self.youtube_chat = None
         self.chat_scraper = None
 
@@ -79,15 +80,6 @@ class LiveStreamChatBot:
         self.message_log = queue.Queue()
         self.disable_chat_save = False
         self.setup()
-        
-        #SpeechToText
-        self.speech_to_text = SpeechToText(self)
-        self.speech_thread = threading.Thread(target=self.start_speech_recognition)
-
-    def start_speech_recognition(self):
-        while not self.stop_running:
-
-                self.speech_to_text.listen_microphone()
 
     def setup(self):
         if not os.path.exists('chat_logs'):
@@ -122,31 +114,10 @@ class LiveStreamChatBot:
     #     self.message_queue.put({"author": author, "message": message, "timestamp": datetime.utcnow().isoformat() + 'Z'})
 
     def fetch_messages(self):
-
         logger.info("Fetching Messages")
 
-        if self.manual:
-            input_manager = InputManager(self.manual_message_callback, self.stop_running)
-            try:
-                input_manager.start()
-                while not self.stop_running:
-                    # Here we're simply waiting for the stop signal
-                    pass
-            except UnicodeDecodeError:
-                logger.verbose("Caught UnicodeDecodeError. Skipping message")
-            except SystemExit:
-                pass
-            except Exception as e:
-                logger.error(f"Caught exception handling manual input:\n{str(e)}", exc_info=True)
-            finally:
-                input_manager.stop()  # Make sure to stop the input manager
-
-            logger.verbose("End of manual loop.")
-            return
-
-        logger.debug("Not manual mode.")
         if self.replay_file:
-            self.disable_chat_save = True # Disable chat saving if we're replaying a file
+            self.disable_chat_save = True
             logger.debug(f"Replay file specified, loading {self.replay_file}")
             if os.path.exists(self.replay_file):
                 with open(self.replay_file, 'r') as f:
@@ -155,7 +126,6 @@ class LiveStreamChatBot:
                 logger.error(f"Replay file {self.replay_file} does not exist.")
                 self.stop_running = True
                 raise ValueError(f"Replay file {self.replay_file} does not exist.")
-
 
             prev_timestamp = None
             for entry in chat_log:
@@ -166,7 +136,7 @@ class LiveStreamChatBot:
                     time_diff = datetime.fromisoformat(entry['timestamp'].rstrip('Z')) - datetime.fromisoformat(prev_timestamp.rstrip('Z'))
 
                     delay = time_diff.total_seconds()
-                    logger.debug(f"Delaying for {delay} seconds to simulate real time.")
+                    logger.debug(f"Delaying for {delay} seconds to simulate real-time.")
                     for _ in range(int(delay)):
                         if self.stop_running:
                             return
@@ -180,10 +150,7 @@ class LiveStreamChatBot:
                 prev_timestamp = entry['timestamp']
             return
 
-
         while not self.stop_running:
-
-
             messages = self.chat_merger.get_unique_messages()
 
             if self.first_run:
@@ -192,7 +159,7 @@ class LiveStreamChatBot:
                 self.chat_merger.seen_messages_hashes.clear()
             else:
                 for message in messages:
-                    logger.debug(f"Recieved Message: {message}")
+                    logger.debug(f"Received Message: {message}")
                     self.message_queue.put(message)
 
     def save_messages_to_file(self):
@@ -232,62 +199,58 @@ class LiveStreamChatBot:
                 logger.error(f"Error while saving messages to file: {e}", exc_info=True)
 
 
-    def process_messages(self):
+    def process_messages(self, message_data):  # Accept message_data as an argument
         while not self.message_queue.empty() and not self.stop_running:
             raw_output = self.message_queue.get()
             logger.verbose(f"Processing message: {raw_output}")
 
-            author = raw_output['author']
-            timestamp = raw_output['timestamp']
-            message = raw_output['message']
+            author = message_data['author']
+            timestamp = message_data['timestamp']
+            message = message_data['message']
 
-        if message == "":
-            continue
-
-        relevant = True
-        try:
-            relevant = self.context_parser.is_relevant(raw_output)
-            logger.verbose(f"Message relevant: {relevant}")
-            if not relevant:
+            if message == "":  # Ignore empty messages
                 continue
-        except Exception as e:
-            logger.error(f"Error while checking relevance of message: {e}", exc_info=True)
 
-        formatted_message = f"From: {author}, {message}"
-        response = "Oops! I've momentarily slipped into another dimension. Let's realign our cosmic frequencies and try that again."
-        try:
-            # Here, you can process the recognized text (formatted_message) as needed
-            # For example, you can pass it to OpenAI or perform any other actions.
-            # The response should be stored in the 'response' variable.
-            response = "Processed response"  # Modify this line with your processing logic.
-        except Exception as e:
-            logger.error(f"Error while processing response: {e}", exc_info=True)
-
-        self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response, "relevant": relevant})
-        logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
-        logger.debug(f"Received Response from Processing: {response}")
-
-        self.all_messages_context.append(raw_output)
-        self.all_messages_context.append({"role": "system", "content": f"{response}"})
-        self.all_messages_context = self.all_messages_context[-100:]
-
-        if not disable_tts:
-            # Generate TTS audio from the response and give it to a file
-            start_time = time.time()
+            relevant = True
             try:
-                tts_audio_path = self.generate_tts_audio(response)
+                relevant = self.context_parser.is_relevant(message_data)  # Use message_data
+                logger.verbose(f"Message relevant: {relevant}")
+                if not relevant:
+                    continue
             except Exception as e:
-                logger.error(f"Error while generating TTS audio: {e}", exc_info=True)
-                continue
-            end_time = time.time()
-            step_time = end_time - start_time
-            logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
-            logger.debug("Playing TTS Audio")
-            self.play_audio_file(tts_audio_path)
-            os.remove(tts_audio_path)
+                logger.error(f"Error while checking relevance of message: {e}", exc_info=True)
 
-        # self.youtube_client.send_chat_message(self.live_chat_id, str(response))
+            formatted_message = f"From: {author}, {message}"
+            response = "Oops! I've momentarily slipped into another dimension. Let's realign our cosmic frequencies and try that again."
+            try:
+                response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
+            except Exception as e:
+                logger.error(f"Error while getting response from OpenAI: {e}", exc_info=True)
 
+            self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response, "relevant": relevant})
+            logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
+            logger.debug(f"Recieved Response from OpenAI: {response}")
+
+            self.all_messages_context.append(message_data)  # Use message_data
+            self.all_messages_context.append({"role": "system", "content": f"{response}"})
+            self.all_messages_context = self.all_messages_context[-100:]
+
+            if not disable_tts:
+                # Generate TTS audio from the response and give it to a file
+                start_time = time.time()
+                try:
+                    tts_audio_path = self.generate_tts_audio(response)
+                except Exception as e:
+                    logger.error(f"Error while generating TTS audio: {e}", exc_info=True)
+                    continue
+                end_time = time.time()  # Add timestamp at the end
+                step_time = end_time - start_time
+                logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+                logger.debug("Playing TTS Audio")
+                self.play_audio_file(tts_audio_path)
+                os.remove(tts_audio_path)
+
+            #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
 
             # ADD TTS stuff here probably, you suck 
 
@@ -313,18 +276,13 @@ class LiveStreamChatBot:
             input=input_text, voice=voice, audio_config=audio_config
         )
 
+        # Get the current script's directory
+        script_directory = os.path.dirname(os.path.abspath(__file__))
+
         # Save the TTS audio to a file
-        logger.debug(f"Saving TTS Return")
-        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
+        tts_audio_path = os.path.join(script_directory, "tts_audio.wav")
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
-        logger.debug(f"Saving TTS Return")
-
-        #playsound(audio_file, winsound.SND_ASYNC)
-
-        audio_file = os.path.join(os.path.dirname(__file__), tts_audio_path)
-        # media = vlc.MediaPlayer(audio_file)
-        # media.play()
 
         return tts_audio_path
 
@@ -357,11 +315,11 @@ class LiveStreamChatBot:
                     return
                 time.sleep(1)
 
+        self.speech_to_text.start_listening()
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
-        self.speech_thread.start()
         logger.info("Hopii is running.")
         try:
             while not self.stop_running:
@@ -404,16 +362,3 @@ if __name__ == '__main__':
     # bot.manual = True
     # bot.replay_file = "chat_logs/20230918_143330.json"
     bot.run()
-
-def main():
-    bot = LiveStreamChatBot(channel_id)
-    bot.run()
-
-if __name__ == '__main__':
-    # Create a separate process for the main function of the first script
-    import multiprocessing
-    p1 = multiprocessing.Process(target=main)
-    p1.start()
-
-    # Wait for user input from the second script
-    p1.join()
