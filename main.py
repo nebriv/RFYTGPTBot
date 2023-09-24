@@ -359,7 +359,7 @@ class LiveStreamChatBot:
 
     def shutdown(self):
         logger.info("Shutting down Hopii.")
-        self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
+        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
         time.sleep(1)
         self.stop_running = True
         if self.chat_scraper:
