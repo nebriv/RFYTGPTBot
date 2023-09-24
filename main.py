@@ -38,8 +38,6 @@ class LiveStreamChatBot:
 
         self.youtube_chat = None
         self.chat_scraper = None
-        self.speech_to_text = SpeechToText()
-        
 
         if YouTubeChat:
             self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
@@ -89,26 +87,6 @@ class LiveStreamChatBot:
         # Generate the filename based on the current date and time
         current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.output_file_path = f"chat_logs/{current_datetime_str}.json"
-    
-    def process_speech_to_text(self):
-        while not self.stop_running:
-            if self.speech_to_text.is_listening:
-                transcribed_text = self.speech_to_text.transcribed_text
-                if transcribed_text:
-                    # Process the transcribed text as if it were a message from YouTube chat
-                    self.process_transcribed_text(transcribed_text)
-    
-    def process_transcribed_text(self, transcribed_text):
-        #Process the transcribed text as needed, e.g., send it to GPT-3 for a response
-        # You can use self.bot or any other processing logic here
-        author = "Rocket Future"  # You can set a custom author for transcribed text
-        formatted_message = f"From: {author}, {transcribed_text}"
-    
-        # Send the transcribed text to GPT-3 or perform any other processing
-        response = self.bot.get_response_text(author, formatted_message, self.all_messages_context)
-    
-        # You can log or handle the response as needed
-        logger.info({"author": author, "message": transcribed_text, "response": response})
 
     def refresh_prompt(self):
         while not self.stop_running:
@@ -367,16 +345,11 @@ class LiveStreamChatBot:
                     return
                 time.sleep(1)
 
-        self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
+        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
         logger.info("Hopii is running.")
-
-         # Start a thread to process speech-to-text
-        speech_thread = threading.Thread(target=self.process_speech_to_text)
-        speech_thread.start()
-
         try:
             while not self.stop_running:
                 self.process_messages()
@@ -384,7 +357,6 @@ class LiveStreamChatBot:
         except KeyboardInterrupt:  # Graceful shutdown
             self.shutdown()
 
-       
     def shutdown(self):
         logger.info("Shutting down Hopii.")
         self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
@@ -418,4 +390,6 @@ if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
     # bot.manual = True
     # bot.replay_file = "chat_logs/20230918_143330.json"
+    speech_to_text = SpeechToText(bot)
+    speech_to_text.start_listening()
     bot.run()
