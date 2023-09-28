@@ -4,6 +4,10 @@ from lib.logger import logger
 import keyboard
 from datetime import datetime
 
+
+#Currenly Broken: The hotkey to stop listening. The whole hotkey functionality may need a complete rework, not sure.
+#                 After the initial message is processed, there seems to be a random delay before the main script processes additional STT lines
+
 class SpeechToText:
     def __init__(self, bot):
         self.bot = bot
