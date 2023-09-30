@@ -65,7 +65,7 @@ class LiveStreamChatBot:
         self.manual = False
 
         self.bot = ChatGPT(config=self.config)
-        self.context_parser = ContextParser()
+        self.context_parser = ContextParser(config=self.config)
 
         self.bot.setup(self.config.openai_key, prompt_prefix=prompt_prefix)
         self.message_queue = queue.Queue()
@@ -346,7 +346,7 @@ class LiveStreamChatBot:
             # Play the audio
             sd.play(data)
         except ValueError as err:
-            if "No output device matching" in str(err):
+            if "No output device matching" in str(err) or "Error querying device" in str(err):
                 logger.critical(f"Invalid/missing output device: {self.config.tts_output_device}")
                 self.shutdown()
 
