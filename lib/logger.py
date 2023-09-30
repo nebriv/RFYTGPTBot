@@ -1,6 +1,6 @@
 import logging
 
-
+# Define custom VERBOSE level and logging method
 VERBOSE = 15
 logging.addLevelName(VERBOSE, "VERBOSE")
 
@@ -10,21 +10,16 @@ def verbose(self, message, *args, **kws):
 
 logging.Logger.verbose = verbose
 
-# Create a logger named 'myapp'
+# Create and configure logger and handler
 logger = logging.getLogger('RFYTGPTBot')
-logger.setLevel(logging.DEBUG)  # Set level for your application
-logger.propagate = False
-# Create a console handler and set level to debug
+logger.setLevel(logging.DEBUG)
+logger.propagate = False  # Prevent log records from being passed to the handlers of ancestor loggers
+
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)  # Or whichever level you want
-
-# Create formatter
+ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s (%(module)s.%(funcName)s) - %(levelname)s - %(message)s')
-
-# Add formatter to ch
 ch.setFormatter(formatter)
-
 logger.addHandler(ch)
 
-# This line sets the logging level for all third-party libraries to WARNING
+# Configure the root logger
 logging.getLogger().setLevel(logging.WARNING)

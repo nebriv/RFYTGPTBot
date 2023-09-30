@@ -5,10 +5,11 @@ from collections import deque
 
 class ChatMerger:
 
-    def __init__(self, chat_scraper=None, youtube_chat=None):
+    def __init__(self, config, chat_scraper=None, youtube_chat=None):
+        self.config = config
         self.chat_scraper = chat_scraper
         self.youtube_chat = youtube_chat
-        self.seen_messages_hashes = deque(maxlen=50)
+        self.seen_messages_hashes = deque(maxlen=self.config.chatmerger_message_history)
 
 
     def _hash_message(self, message):

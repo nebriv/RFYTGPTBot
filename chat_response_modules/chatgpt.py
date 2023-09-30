@@ -3,6 +3,8 @@ from .base import ChatBot
 from lib.logger import logger
 
 class ChatGPT(ChatBot):
+    def __init__(self, config):
+        super().__init__(config)
 
     def setup(self, api_key, prompt_prefix=None):
         openai.api_key = api_key
@@ -33,9 +35,11 @@ class ChatGPT(ChatBot):
         logger.debug(f"Sending messages to OpenAI: {messages}")
 
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # Use the chat-based model
+            model=self.config.chatgpt_model,  # Use the chat-based model
             messages=messages,
-            max_tokens=300  # Adjust based on your needs
+            max_tokens=self.config.chatgpt_max_tokens,  # Adjust based on your needs
+            temperature=self.config.chatgpt_temperature,  # Adjust based on your needs
+            top_p=self.config.chatgpt_top_p  # Adjust based on your needs
         )
 
         # Extract the message text from the response

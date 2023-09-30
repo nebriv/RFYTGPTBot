@@ -6,9 +6,10 @@ from lib.logger import logger
 
 class YouTubeChat:
 
-    def __init__(self, youtube_client, bot_display_name):
+    def __init__(self, config, youtube_client):
+        self.config = config
         logger.info("Setting up YouTubeChat API")
-        self.bot_display_name = bot_display_name
+        self.bot_display_name = self.config.bot_display_name
         self.live_chat_id = None
         self.next_page_token = None
 

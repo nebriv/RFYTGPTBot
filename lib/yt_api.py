@@ -6,7 +6,8 @@ from lib.logger import logger
 import pickle
 
 class YouTubeClient:
-    def __init__(self, channel_id):
+    def __init__(self, config, channel_id=None):
+        self.config = config
         # Load the client secrets from the downloaded JSON
         client_secrets_file = "google_secret.json"
 
@@ -34,7 +35,11 @@ class YouTubeClient:
                 pickle.dump(creds, token)
 
         self.youtube = build("youtube", "v3", credentials=creds)
-        self.channel_id = channel_id
+
+        if channel_id is None:
+            self.channel_id = channel_id
+        else:
+            self.channel_id = self.config.channel_id
 
     def get_live_chat_id(self):
         request = self.youtube.liveBroadcasts().list(part="id,snippet,contentDetails,status", broadcastStatus="active")
@@ -90,7 +95,7 @@ class YouTubeClient:
 
 
 if __name__ == '__main__':
-    from config import *
+
     yt = YouTubeClient(channel_id)
     live_chat_id = yt.get_live_chat_id()
     logger.info(live_chat_id)

@@ -18,9 +18,6 @@ from dateutil.tz import tzlocal
 
 chromedriver_autoinstaller.install()
 
-logging.basicConfig(level=logging.INFO)
-
-
 def is_element_in_viewport(driver, element, padding=10):
     return driver.execute_script("""
         let rect = arguments[0].getBoundingClientRect();
@@ -105,8 +102,9 @@ def round_to_nearest_minute(dt):
 
 class YoutubeChatScraper:
 
-    def __init__(self, live_id, bot_display_name, driver_options=None):
-        self.bot_display_name = bot_display_name
+    def __init__(self, config, live_id, driver_options=None):
+        self.config = config
+        self.bot_display_name = self.config.bot_display_name
         self.url = f"https://www.youtube.com/live_chat?is_popout=1&v={live_id}"
         self.seen_messages = set()
         self.message_queue = queue.Queue()
@@ -362,6 +360,7 @@ class YoutubeChatScraper:
         self.driver.quit()
         self.driver = self._initialize_driver()
         self.start_threaded()
+
 
 if __name__ == '__main__':
     scraper = YoutubeChatScraper("https://www.youtube.com/live_chat?is_popout=1&v=mhJRzQsLZGg")
