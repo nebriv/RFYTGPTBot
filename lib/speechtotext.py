@@ -1,74 +1,112 @@
-import speech_recognition as sr
 import threading
-from lib.logger import logger
-import keyboard
+import time
 from datetime import datetime
-
-
-#Currenly Broken: The hotkey to stop listening. The whole hotkey functionality may need a complete rework, not sure.
-#                 After the initial message is processed, there seems to be a random delay before the main script processes additional STT lines
+import speech_recognition as sr
+from pynput import keyboard as pynput_keyboard
 
 class SpeechToText:
-    def __init__(self, bot):
+    def __init__(self, bot=None):
         self.bot = bot
         self.recognizer = sr.Recognizer()
         self.listening = False
-        self.stop_listening_thread = False  # Shared variable to signal when to stop the listening thread
+        self.audio_listener_running = False
+        self.keep_listening = threading.Event()
+        self.stop_event = threading.Event()
+        self.audio_stop_event = threading.Event()
         self.listen_thread = None
-
-    def listen_microphone(self):
-        with sr.Microphone() as source:
-            logger.info("Waiting for hotkey to start listening...")
-            keyboard.wait('0')  # Wait for the '0' key to start listening
-            self.listening = not self.listening  # Toggle the listening state
-            logger.info("Listening..." if self.listening else "Stopped listening")
-
-            while not self.stop_listening_thread:  # Continue listening until signaled to stop
-                try:
-                    audio = self.recognizer.listen(source, timeout=2)  # Listen in 2-second chunks
-                except sr.WaitTimeoutError:
-                    continue  # No speech detected, continue listening
-                except Exception as e:
-                    logger.error("An error occurred: %s", e)
-                    break
-
-                if audio and self.listening:  # Only process audio when listening
-                    try:
-                        text = self.recognizer.recognize_google(audio)
-                        logger.info("You said: %s", text)
-
-                        # Send the recognized speech with author and timestamp to the message queue
-                        message_data = {
-                            "author": "Rocket Future",
-                            "timestamp": datetime.now().isoformat(),
-                            "message": text
-                        }
-                        self.bot.message_queue.put(message_data)
-                    except sr.UnknownValueError:
-                        logger.info("Could not understand audio")
-                    except sr.RequestError as e:
-                        logger.error("Could not request results: %s", e)
-
-            logger.info("Stopped listening.")
 
     def start_listening(self):
         if not self.listening:
-            self.stop_listening_thread = False  # Reset the stop flag
+            self.keep_listening.set()
+            self.stop_event.clear()
+            self.audio_stop_event.clear()
             self.listen_thread = threading.Thread(target=self.listen_microphone)
             self.listen_thread.start()
 
     def stop_listening(self):
-        self.stop_listening_thread = True  # Signal the thread to stop
-        if self.listen_thread is not None:
-            self.listen_thread.join()  # Wait for the thread to finish
+        if self.listening:
+            self.listening = False
+            self.keep_listening.clear()
+            self.audio_stop_event.set()  # Ensure audio_listener thread stops.
+            self.stop_event.set()  # Ensure listen_microphone thread stops.
+            if self.listen_thread is not None and self.listen_thread.is_alive():
+                if threading.current_thread() != self.listen_thread:
+                    self.listen_thread.join()
+            self.listen_thread = None
+
+    def process_audio(self, audio):
+        try:
+            text = self.recognizer.recognize_google(audio)
+            print(f"You said: {text}")  # Replace print with logger.info
+            message_data = {
+                "author": "Rocket Future",
+                "timestamp": datetime.now().isoformat(),
+                "message": text
+            }
+            if self.bot:
+                self.bot.message_queue.put(message_data)
+        except Exception as e:
+            print(f"Error processing audio: {e}")  # Replace print with logger.error
+
+    def audio_listener(self):
+        self.audio_listener_running = True
+        with sr.Microphone() as source:
+            while not self.audio_stop_event.is_set() and self.listening:
+                try:
+                    audio = self.recognizer.listen(source, timeout=2)
+                    self.process_audio(audio)
+                except Exception as e:
+                    print(f"Error listening to audio: {e}")
+        self.audio_listener_running = False
+
+    def on_press(self, key):
+        try:
+            if key.char == '0':
+                self.pressed_count += 1
+                self.unpressed_count = 0  # Reset unpressed_count when '0' key is pressed
+        except AttributeError:
+            pass
+
+    def listen_microphone(self):
+        self.unpressed_count = 0
+        self.pressed_count = 0
+        listener = pynput_keyboard.Listener(on_press=self.on_press)
+        listener.start()
+        try:
+            while not self.stop_event.is_set():
+                if not self.keep_listening.is_set():
+                    continue
+
+                self.unpressed_count += 1
+
+                print(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
+                if self.pressed_count > 5 and not self.listening and not self.audio_listener_running:
+                    print("Start actual listening here...")
+                    self.listening = True
+                    self.audio_stop_event.clear()
+                    threading.Thread(target=self.audio_listener).start()
+
+                if self.unpressed_count > 5 and self.listening and self.audio_listener_running:
+                    self.pressed_count = 0
+                    print("Stop actual listening here...")
+                    self.audio_stop_event.set()
+                    self.listening = False
+
+                time.sleep(0.1)
+        finally:
+            listener.stop()
+
 
 if __name__ == "__main__":
-    # Replace 'YOUR_BOT_INSTANCE' with the actual instance of your bot.
-    bot_instance = YOUR_BOT_INSTANCE
-    speech_to_text = SpeechToText(bot_instance)
-
-    # Replace 'ctrl+shift+0' with your desired hotkey for stopping listening.
-    keyboard.add_hotkey('ctrl+shift+0', lambda: speech_to_text.stop_listening())
-    
-    # Start listening when the script is run
+    bot = None  # Replace with your bot instance
+    speech_to_text = SpeechToText(bot)
     speech_to_text.start_listening()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        speech_to_text.stop_event.set()
+        print("Ctrl+C pressed. Exiting...")
+    finally:
+        speech_to_text.stop_listening()
