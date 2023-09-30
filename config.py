@@ -49,8 +49,6 @@ class Config:
         except configparser.NoSectionError:
             logging.error("YoutubeChannelInfo section not found in config.ini!")
 
-
-
         # ChatFetchers
         try:
             self.chat_fetcher_ytscraper_enabled = config.getboolean('ChatFetchers.YTScraper', 'enabled', fallback=False)
@@ -66,7 +64,7 @@ class Config:
                 self.tts_output_device = config.get('TTS', 'output_device', fallback=None)
                 if self.tts_output_device is None:
                     raise ValueError("Audio output device needed for TTS not found in config.ini!")
-                self.tts_file_output_path = config.get('TTS', 'file_output_path', fallback='tts_output.wav')
+                self.tts_file_output_path = config.get('TTS', 'file_output_path', fallback='tts_output.mp3')
                 self.tts_language_code = config.get('TextToSpeech', 'language_code', fallback='en-US')
                 self.tts_name = config.get('TextToSpeech', 'name', fallback='en-US-Studio-O')
                 self.tts_ssml_gender = config.get('TextToSpeech', 'ssml_gender', fallback='FEMALE')
