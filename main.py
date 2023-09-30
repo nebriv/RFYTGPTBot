@@ -28,32 +28,36 @@ class LiveStreamChatBot:
     def __init__(self):
         self.config = Config('config.ini')
         logger.setLevel(self.config.log_level)
+        self.youtube_chat = None
+        self.chat_scraper = None
 
-        if self.config.chat_fetcher_ytapi_enabled:
-            from chat_fetchers.yt_api_chat import YouTubeChat
-        if self.config.chat_fetcher_ytscraper_enabled:
-            from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
 
         logger.info("Starting LiveStreamChatBot")
-        self.youtube_api_client = YouTubeClient(self.config.channel_id)
-        self.live_id = self.youtube_api_client.get_live_id()
+        if self.config.youtube_api_enabled:
+            self.youtube_api_client = YouTubeClient(self.config.channel_id)
+            self.live_id = self.youtube_api_client.get_live_id()
+        else:
+            logger.warning("YouTube API not enabled. Using live id from config.ini")
+            self.live_id = self.config.youtube_live_id
+
         if not self.live_id:
             logger.error(f"Channel {self.config.channel_id} is not currently live.")
             exit()
 
 
-        self.youtube_chat = None
-        self.chat_scraper = None
+
 
         if not self.config.chat_fetcher_ytapi_enabled and not self.config.chat_fetcher_ytscraper_enabled:
             logger.error("No chat fetchers enabled. Please enable at least one chat fetcher in config.ini.")
             exit()
 
-        if YouTubeChat:
+        if self.config.chat_fetcher_ytapi_enabled:
+            from chat_fetchers.yt_api_chat import YouTubeChat
             self.youtube_chat = YouTubeChat(self.config, self.youtube_api_client)
+        if self.config.chat_fetcher_ytscraper_enabled:
+            from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
+            self.chat_scraper = YoutubeChatScraper(self.config, self.live_id)
 
-        if YoutubeChatScraper:
-            self.chat_scraper = YoutubeChatScraper(self.config, self.youtube_api_client.get_live_id())
 
         self.chat_merger = ChatMerger(self.config, self.chat_scraper, self.youtube_chat)
 
@@ -67,11 +71,13 @@ class LiveStreamChatBot:
         self.message_queue = queue.Queue()
 
         self.all_messages_context = []
-
-        self.live_chat_id = self.youtube_api_client.get_live_chat_id()
-        if not self.live_chat_id:
-            logger.error("Not currently live.")
-            return False
+        self.live_chat_id = None
+        if not self.config.youtube_api_enabled:
+            logger.warning("YouTube API not enabled. Unable to get live chat ID.")
+        else:
+            self.live_chat_id = self.youtube_api_client.get_live_chat_id()
+            if not self.live_chat_id:
+                logger.error("Tried to get live chat id, but got none. Likely not live!?")
 
         self.bot_display_name = self.config.bot_display_name
         
@@ -360,7 +366,8 @@ class LiveStreamChatBot:
                     return
                 time.sleep(1)
 
-        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
+        if self.live_chat_id and self.config.youtube_api_send_chat:
+            self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         if self.config.chat_logging_enabled:
             self.file_writer_thread.start()
@@ -375,7 +382,8 @@ class LiveStreamChatBot:
 
     def shutdown(self):
         logger.info("Shutting down Hopii.")
-        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
+        if self.live_chat_id and self.config.youtube_api_send_chat:
+            self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
         time.sleep(1)
         self.stop_running = True
         if self.chat_scraper:
