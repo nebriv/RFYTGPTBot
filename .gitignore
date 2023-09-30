@@ -1,6 +1,5 @@
 google_secret.json
 token.json
-config.py
 prompt_config.py
 googleapi.json
 azureapi.json
@@ -245,3 +244,4 @@ dmypy.json
 cython_debug/
 
 *.mp3
+/config.ini

@@ -1,10 +1,10 @@
 from better_profanity import profanity
 
-
 class ChatBot:
-    profanity.load_censor_words()
-    def __init__(self):
-        pass
+
+    def __init__(self, config):
+        self.config = config
+        profanity.load_censor_words(whitelist_words=self.config.profanity_filter_allowlist)
 
     def setup(self):
         raise NotImplemented("ChatBot.setup() must be implemented by subclass.")
@@ -25,8 +25,9 @@ class ChatBot:
         return truncated
 
     def get_response_text(self, author, chat_message, chat_history=None):
-        if profanity.contains_profanity(chat_message):
-            return "Hey Mods? Someone in chat is using those sentence enhancers again."
+        if self.config.profanity_filter_enabled and author not in self.config.profanity_filter_author_allowlist:
+            if profanity.contains_profanity(chat_message):
+                return "Hey Mods? Someone in chat is using those sentence enhancers again."
         return self.respond_to(author, chat_message, chat_history)
 
     def respond_to(self, message, chat_history=None):

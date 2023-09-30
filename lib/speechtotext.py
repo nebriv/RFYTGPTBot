@@ -9,9 +9,16 @@ try:
 except ImportError:
     from logger import logger
 
+
+
 class SpeechToText:
-    def __init__(self, bot=None):
+    def __init__(self, config=None, bot=None):
         self.bot = bot
+        self.config = config
+        if self.config is None:
+            self.config.stt_hotkey = '0'
+            self.config.stt_start_delay = 3
+            self.config.stt_stop_delay = 3
         self.recognizer = sr.Recognizer()
         self.listening = False
         self.audio_listener_running = False
@@ -58,7 +65,7 @@ class SpeechToText:
         with sr.Microphone() as source:
             while not self.audio_stop_event.is_set() and self.listening:
                 try:
-                    audio = self.recognizer.listen(source, timeout=2)
+                    audio = self.recognizer.listen(source, timeout=self.config.stt_listen_timeout)
                     self.process_audio(audio)
                 except speech_recognition_exceptions.WaitTimeoutError as e:
                     logger.debug(f"Timeout listening to audio: {e}")
@@ -68,7 +75,7 @@ class SpeechToText:
 
     def on_press(self, key):
         try:
-            if key.char == '0':
+            if key.char == self.config.stt_hotkey:
                 self.pressed_count += 1
                 self.unpressed_count = 0  # Reset unpressed_count when '0' key is pressed
         except AttributeError:
@@ -87,13 +94,13 @@ class SpeechToText:
                 self.unpressed_count += 1
 
                 logger.debug(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
-                if self.pressed_count > 5 and not self.listening and not self.audio_listener_running:
+                if self.pressed_count > self.config.stt_start_delay and not self.listening and not self.audio_listener_running:
                     logger.info("Start listening...")
                     self.listening = True
                     self.audio_stop_event.clear()
                     threading.Thread(target=self.audio_listener).start()
 
-                if self.unpressed_count > 5 and self.listening and self.audio_listener_running:
+                if self.unpressed_count > self.config.stt_stop_delay and self.listening and self.audio_listener_running:
                     self.pressed_count = 0
                     logger.info("Stop listening...")
                     self.audio_stop_event.set()

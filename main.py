@@ -4,13 +4,12 @@ import time
 import queue
 import threading
 import os
-from config import *
+from config import Config
 from google.cloud import texttospeech_v1beta1 as texttospeech
 import sounddevice as sd
 import soundfile as sf
 import prompt_config
-from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
-from chat_fetchers.yt_api_chat import YouTubeChat
+
 from lib.chat_merger import ChatMerger
 from lib.logger import logger
 import json
@@ -25,48 +24,56 @@ prompt_prefix = prompt_config.prompt_prefix
 
 ContextParser.install_spacy_model()
 
-message_history = -50
-
-disable_tts = False
-
 class LiveStreamChatBot:
-    def __init__(self, channel_id):
+    def __init__(self):
+        self.config = Config('config.ini')
+        logger.setLevel(self.config.log_level)
+
+        if self.config.chat_fetcher_ytapi_enabled:
+            from chat_fetchers.yt_api_chat import YouTubeChat
+        if self.config.chat_fetcher_ytscraper_enabled:
+            from chat_fetchers.yt_chat_scraper import YoutubeChatScraper
+
         logger.info("Starting LiveStreamChatBot")
-        self.youtube_api_client = YouTubeClient(channel_id)
+        self.youtube_api_client = YouTubeClient(self.config.channel_id)
         self.live_id = self.youtube_api_client.get_live_id()
         if not self.live_id:
-            logger.error(f"Channel {channel_id} is not currently live.")
+            logger.error(f"Channel {self.config.channel_id} is not currently live.")
             exit()
+
 
         self.youtube_chat = None
         self.chat_scraper = None
 
+        if not self.config.chat_fetcher_ytapi_enabled and not self.config.chat_fetcher_ytscraper_enabled:
+            logger.error("No chat fetchers enabled. Please enable at least one chat fetcher in config.ini.")
+            exit()
+
         if YouTubeChat:
-            self.youtube_chat = YouTubeChat(self.youtube_api_client, bot_display_name)
+            self.youtube_chat = YouTubeChat(self.config, self.youtube_api_client)
 
         if YoutubeChatScraper:
-            self.chat_scraper = YoutubeChatScraper(self.youtube_api_client.get_live_id(), bot_display_name)
+            self.chat_scraper = YoutubeChatScraper(self.config, self.youtube_api_client.get_live_id())
 
-        self.chat_merger = ChatMerger(self.chat_scraper, self.youtube_chat)
+        self.chat_merger = ChatMerger(self.config, self.chat_scraper, self.youtube_chat)
 
         self.replay_file = None
         self.manual = False
 
-        self.bot = ChatGPT()
+        self.bot = ChatGPT(config=self.config)
         self.context_parser = ContextParser()
 
-        self.bot.setup(openai_key, prompt_prefix=prompt_prefix)
+        self.bot.setup(self.config.openai_key, prompt_prefix=prompt_prefix)
         self.message_queue = queue.Queue()
 
         self.all_messages_context = []
-        self.max_global_context_length = 100
 
         self.live_chat_id = self.youtube_api_client.get_live_chat_id()
         if not self.live_chat_id:
             logger.error("Not currently live.")
             return False
 
-        self.bot_display_name = bot_display_name
+        self.bot_display_name = self.config.bot_display_name
         
         # Timestamp of the last processed message
         now = datetime.utcnow().isoformat() + 'Z'  # current UTC timestamp in YouTube's format
@@ -74,9 +81,9 @@ class LiveStreamChatBot:
         
         self.stop_running = False  # Flag to stop the fetch thread if necessary
         self.first_run = True
-        self.prompt_refresh_interval = 300  # Seconds between refreshing the prompt
         self.fetch_thread = threading.Thread(target=self.fetch_messages)
-        self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(30,))
+        if self.config.chat_logging_enabled:
+            self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(self.config.chat_logging_file_write_frequency,))
         self.refresh_prompt_thread = threading.Thread(target=self.refresh_prompt)
         self.message_log = queue.Queue()
         self.disable_chat_save = False
@@ -84,16 +91,16 @@ class LiveStreamChatBot:
         self.setup()
 
     def setup(self):
-        if not os.path.exists('chat_logs'):
-            os.makedirs('chat_logs')
-        cleanup_folder('chat_logs', 10)
+        if not os.path.exists(self.config.chat_logging_directory):
+            os.makedirs(self.config.chat_logging_directory)
+        cleanup_folder(self.config.chat_logging_directory, 10)
         # Generate the filename based on the current date and time
         current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_file_path = f"chat_logs/{current_datetime_str}.json"
+        self.output_file_path = f"{self.config.chat_logging_directory}/{current_datetime_str}.json"
 
     def refresh_prompt(self):
         while not self.stop_running:
-            for _ in range(self.prompt_refresh_interval):
+            for _ in range(self.config.prompt_history_refresh_seconds):
                 if self.stop_running:
                     return
                 time.sleep(1)
@@ -103,17 +110,6 @@ class LiveStreamChatBot:
 
     def manual_message_callback(self, message_data):
         self.message_queue.put(message_data)
-
-    # def manual_message_prompt(self):
-    #     """Manually prompt for a message to send."""
-    #     current_level = logging.getLogger().getEffectiveLevel()
-    #     logging.getLogger().setLevel(logging.CRITICAL)
-    #     author = input("Enter author name (Bob): ")
-    #     if not author:
-    #         author = "Bob"
-    #     message = input("Enter message to send: ")
-    #     logging.getLogger().setLevel(current_level)
-    #     self.message_queue.put({"author": author, "message": message, "timestamp": datetime.utcnow().isoformat() + 'Z'})
 
     def fetch_messages(self):
 
@@ -176,7 +172,6 @@ class LiveStreamChatBot:
 
 
         while not self.stop_running:
-
 
             messages = self.chat_merger.get_unique_messages()
 
@@ -257,13 +252,13 @@ class LiveStreamChatBot:
 
             self.message_log.put({"author": author, "timestamp": timestamp, "message": message, "response": response, "relevant": relevant})
             logger.info({"author": author, "timestamp": timestamp, "message": message, "response": response})
-            logger.debug(f"Recieved Response from OpenAI: {response}")
+            logger.debug(f"Received Response from OpenAI: {response}")
 
             self.all_messages_context.append(raw_output)
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
-            self.all_messages_context = self.all_messages_context[message_history:]
+            self.all_messages_context = self.all_messages_context[self.config.message_history:]
 
-            if not disable_tts:
+            if self.config.tts_enabled:
                 # Generate TTS audio from the response and give it to a file
                 start_time = time.time()
                 try:
@@ -278,44 +273,56 @@ class LiveStreamChatBot:
                 self.play_audio_file(tts_audio_path)
                 os.remove(tts_audio_path)
 
-            #self.youtube_client.send_chat_message(self.live_chat_id, str(response)) commented out to remove send chat message
-
-            # ADD TTS stuff here probably, you suck 
-
     def generate_tts_audio(self, text):
         logger.debug("Generating TTS")
-        # Initialize the Google Text-to-Speech client
         client = texttospeech.TextToSpeechClient()
 
-        # Configure the TTS request
         input_text = texttospeech.SynthesisInput(text=text)
+
+        # Maps
+        ssml_gender_map = {
+            'FEMALE': texttospeech.SsmlVoiceGender.FEMALE,
+            'MALE': texttospeech.SsmlVoiceGender.MALE,
+            'NEUTRAL': texttospeech.SsmlVoiceGender.NEUTRAL,
+        }
+
+        audio_encoding_map = {
+            'MP3': texttospeech.AudioEncoding.MP3,
+            'LINEAR16': texttospeech.AudioEncoding.LINEAR16,
+        }
+
+        # Check if the provided ssml_gender is valid, if not log an error and use a default
+        ssml_gender = ssml_gender_map.get(self.config.tts_ssml_gender)
+        if ssml_gender is None:
+            logger.error(f"Invalid SSML Gender: {self.config.tts_ssml_gender}. Using default: FEMALE")
+            ssml_gender = texttospeech.SsmlVoiceGender.FEMALE
+
+        # Check if the provided audio_encoding is valid, if not log an error and use a default
+        audio_encoding = audio_encoding_map.get(self.config.tts_audio_encoding)
+        if audio_encoding is None:
+            logger.error(f"Invalid Audio Encoding: {self.config.tts_audio_encoding}. Using default: MP3")
+            audio_encoding = texttospeech.AudioEncoding.MP3
+
+        # Construct voice and audio_config using the verified or defaulted values
         voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Studio-O",
-            #name="en-US-Neural2-F",
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
-        )
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3
+            language_code=self.config.tts_language_code,
+            name=self.config.tts_name,
+            ssml_gender=ssml_gender
         )
 
-        # Generate the TTS audio
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=audio_encoding
+        )
+
         response = client.synthesize_speech(
             input=input_text, voice=voice, audio_config=audio_config
         )
 
-        # Save the TTS audio to a file
         logger.debug(f"Saving TTS Return")
-        tts_audio_path = "tts_audio.wav"  # Specify the path and format (e.g., .wav)        
+        tts_audio_path = self.config.tts_file_output_path
         with open(tts_audio_path, "wb") as audio_file:
             audio_file.write(response.audio_content)
-        logger.debug(f"Saving TTS Return")
-
-        #playsound(audio_file, winsound.SND_ASYNC)
-
-        audio_file = os.path.join(os.path.dirname(__file__), tts_audio_path)
-        # media = vlc.MediaPlayer(audio_file)
-        # media.play()
+        logger.debug(f"TTS Audio saved at {tts_audio_path}")
 
         return tts_audio_path
 
@@ -325,7 +332,7 @@ class LiveStreamChatBot:
 
         # Set default sample rate
         sd.default.samplerate = fs
-        sd.default.device = output_device
+        sd.default.device = self.config.tts_output_device
 
         # Play the audio
         sd.play(data)
@@ -336,21 +343,27 @@ class LiveStreamChatBot:
 
     def run(self):
 
+        if self.config.stt_enabled:
+            speech_to_text = SpeechToText(config=self.config, bot=self)
+            speech_to_text.start_listening()
+            bot.speech_to_text = speech_to_text
+
         if not self.manual and not self.replay_file:
             logger.info("Not manual and not chat replay, starting chat scraper and youtube chat.")
             if self.youtube_chat:
                 self.youtube_chat.start_threaded()
             if self.chat_scraper:
                 self.chat_scraper.start_threaded()
-            logger.info("Letting chat gather for 30 seconds")
-            for _ in range(30):
+            logger.info(f"Letting chat gather for {self.config.chat_fetcher_startup_delay} seconds")
+            for _ in range(self.config.chat_fetcher_startup_delay):
                 if self.stop_running:
                     return
                 time.sleep(1)
 
         #self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
-        self.file_writer_thread.start()
+        if self.config.chat_logging_enabled:
+            self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
         logger.info("Hopii is running.")
         try:
@@ -373,9 +386,10 @@ class LiveStreamChatBot:
             self.youtube_chat.stop()
         current_thread = threading.current_thread()
 
-        if current_thread != self.file_writer_thread:
-            logger.verbose("Waiting for file writer thread to join.")
-            self.file_writer_thread.join()
+        if self.file_writer_thread:
+            if current_thread != self.file_writer_thread:
+                logger.verbose("Waiting for file writer thread to join.")
+                self.file_writer_thread.join()
 
         if current_thread != self.fetch_thread:
             logger.verbose("Waiting for fetch thread to join.")
@@ -396,11 +410,8 @@ class LiveStreamChatBot:
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'googleapi.json'
 
 if __name__ == '__main__':
-    bot = LiveStreamChatBot(channel_id)
+    bot = LiveStreamChatBot()
     # bot.manual = True
     # bot.replay_file = "chat_logs/20230918_143330.json"
-    speech_to_text = SpeechToText(bot)
-    speech_to_text.start_listening()
 
-    bot.speech_to_text = speech_to_text
     bot.run()
