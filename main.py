@@ -19,6 +19,7 @@ import importlib
 from lib.context_parsing import ContextParser
 import logging
 from lib.utils import cleanup_folder, InputManager
+from lib.speechtotext import SpeechToText
 
 prompt_prefix = prompt_config.prompt_prefix
 
@@ -344,7 +345,7 @@ class LiveStreamChatBot:
                     return
                 time.sleep(1)
 
-        self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
+        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Hopii, Wake up!")
         self.fetch_thread.start()
         self.file_writer_thread.start()
         self.refresh_prompt_thread.start()
@@ -358,7 +359,7 @@ class LiveStreamChatBot:
 
     def shutdown(self):
         logger.info("Shutting down Hopii.")
-        self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
+        #self.youtube_api_client.send_chat_message(self.live_chat_id, "Get some rest Hopii, you look tired.")
         time.sleep(1)
         self.stop_running = True
         if self.chat_scraper:
@@ -389,4 +390,6 @@ if __name__ == '__main__':
     bot = LiveStreamChatBot(channel_id)
     # bot.manual = True
     # bot.replay_file = "chat_logs/20230918_143330.json"
+    speech_to_text = SpeechToText(bot)
+    speech_to_text.start_listening()
     bot.run()
