@@ -35,7 +35,7 @@ class ChatGPT(ChatBot):
         response = openai.ChatCompletion.create(
             model="gpt-4",  # Use the chat-based model
             messages=messages,
-            max_tokens=175  # Adjust based on your needs
+            max_tokens=300  # Adjust based on your needs
         )
 
         # Extract the message text from the response
