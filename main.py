@@ -345,6 +345,9 @@ class LiveStreamChatBot:
             sd.default.device = self.config.tts_output_device
             # Play the audio
             sd.play(data)
+        except sd.PortAudioError as err:
+            logger.error(f"PortAudioError: {err}")
+            self.shutdown()
         except ValueError as err:
             if "No output device matching" in str(err) or "Error querying device" in str(err):
                 logger.critical(f"Invalid/missing output device: {self.config.tts_output_device}")
@@ -352,7 +355,6 @@ class LiveStreamChatBot:
 
         # Block execution until audio is finished playing
         sd.wait()
-
 
     def run(self):
 
