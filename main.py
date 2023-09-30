@@ -90,6 +90,9 @@ class LiveStreamChatBot:
         self.fetch_thread = threading.Thread(target=self.fetch_messages)
         if self.config.chat_logging_enabled:
             self.file_writer_thread = threading.Thread(target=self.batched_file_writer, args=(self.config.chat_logging_file_write_frequency,))
+        else:
+            self.file_writer_thread = None
+
         self.refresh_prompt_thread = threading.Thread(target=self.refresh_prompt)
         self.message_log = queue.Queue()
         self.disable_chat_save = False
@@ -393,6 +396,7 @@ class LiveStreamChatBot:
             logger.verbose("Stopping youtube chat.")
             self.youtube_chat.stop()
         current_thread = threading.current_thread()
+
 
         if self.file_writer_thread:
             if current_thread != self.file_writer_thread:
