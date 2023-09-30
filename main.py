@@ -261,7 +261,7 @@ class LiveStreamChatBot:
 
             self.all_messages_context.append(raw_output)
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
-            self.all_messages_context = self.all_messages_context[(message_history):]
+            self.all_messages_context = self.all_messages_context[message_history:]
 
             if not disable_tts:
                 # Generate TTS audio from the response and give it to a file
