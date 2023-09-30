@@ -203,7 +203,7 @@ class ContextParser:
 
     def is_relevant(self, message, bot_name="bot_username"):
         """Check if the text is relevant to the conversation."""
-        message = Message(message, self.nlp)
+        message = Message(self.config, message, self.nlp)
         logger.verbose(f"Message properties: {message.get_properties()}")
         self.add_to_history(message)
 
