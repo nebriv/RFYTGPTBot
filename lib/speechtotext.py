@@ -58,7 +58,7 @@ class SpeechToText:
         with sr.Microphone() as source:
             while not self.audio_stop_event.is_set() and self.listening:
                 try:
-                    audio = self.recognizer.listen(source, timeout=2)
+                    audio = self.recognizer.listen(source, timeout=1)
                     self.process_audio(audio)
                 except speech_recognition_exceptions.WaitTimeoutError as e:
                     logger.debug(f"Timeout listening to audio: {e}")
