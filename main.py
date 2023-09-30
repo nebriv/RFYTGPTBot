@@ -277,7 +277,7 @@ class LiveStreamChatBot:
                     continue
                 end_time = time.time()  # Add timestamp at the end
                 step_time = end_time - start_time
-                logger.info(f"Time taken for generating TTS audio: {step_time} seconds")
+                logger.verbose(f"Time taken for generating TTS audio: {step_time} seconds")
                 logger.debug("Playing TTS Audio")
                 self.play_audio_file(tts_audio_path)
                 os.remove(tts_audio_path)
@@ -341,8 +341,8 @@ class LiveStreamChatBot:
 
         # Set default sample rate
         sd.default.samplerate = fs
-        sd.default.device = self.config.tts_output_device
         try:
+            sd.default.device = self.config.tts_output_device
             # Play the audio
             sd.play(data)
         except ValueError as err:
