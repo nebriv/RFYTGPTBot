@@ -130,7 +130,8 @@ class ContextParser:
             logger.warning(f"{cls.MODEL_NAME} not found. Installing using command: {' '.join(cmd)}")
             subprocess.check_call(cmd)
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.nlp = spacy.load(self.MODEL_NAME)
         self.message_history = deque(maxlen=self.HISTORY_SIZE)
 
