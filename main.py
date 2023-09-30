@@ -342,9 +342,13 @@ class LiveStreamChatBot:
         # Set default sample rate
         sd.default.samplerate = fs
         sd.default.device = self.config.tts_output_device
-
-        # Play the audio
-        sd.play(data)
+        try:
+            # Play the audio
+            sd.play(data)
+        except ValueError as err:
+            if "No output device matching" in str(err):
+                logger.critical(f"Invalid/missing output device: {self.config.tts_output_device}")
+                self.shutdown()
 
         # Block execution until audio is finished playing
         sd.wait()
