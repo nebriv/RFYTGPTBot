@@ -3,8 +3,8 @@ from .base import ChatBot
 from lib.logger import logger
 
 class ChatGPT(ChatBot):
-    def __init__(self, *args, **kwargs):
-        super(ChatBot, self).__init__(*args, **kwargs)
+    def __init__(self, config):
+        super(ChatBot, self).__init__(config)
 
     def setup(self, api_key, prompt_prefix=None):
         openai.api_key = api_key
