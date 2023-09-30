@@ -80,6 +80,7 @@ class LiveStreamChatBot:
         self.refresh_prompt_thread = threading.Thread(target=self.refresh_prompt)
         self.message_log = queue.Queue()
         self.disable_chat_save = False
+        self.speech_to_text = False
         self.setup()
 
     def setup(self):
@@ -383,6 +384,12 @@ class LiveStreamChatBot:
         if current_thread != self.refresh_prompt_thread:
             logger.verbose("Waiting for refresh prompt thread to join.")
             self.refresh_prompt_thread.join()
+
+        if self.speech_to_text:
+            self.speech_to_text.stop_event.set()
+            logger.verbose("Stopping speech to text.")
+            self.speech_to_text.stop_listening()
+
         logger.info("Hopii has shut down.")
         exit()
 
@@ -394,4 +401,6 @@ if __name__ == '__main__':
     # bot.replay_file = "chat_logs/20230918_143330.json"
     speech_to_text = SpeechToText(bot)
     speech_to_text.start_listening()
+
+    bot.speech_to_text = speech_to_text
     bot.run()
