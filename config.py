@@ -61,7 +61,7 @@ class Config:
         try:
             self.tts_enabled = config.getboolean('TTS', 'enabled', fallback=False)
             if self.tts_enabled:
-                self.tts_output_device = config.get('TTS', 'output_device', fallback=None)
+                self.tts_output_device = config.getint('TTS', 'output_device', fallback=None)
                 if self.tts_output_device is None:
                     raise ValueError("Audio output device needed for TTS not found in config.ini!")
                 self.tts_file_output_path = config.get('TTS', 'file_output_path', fallback='tts_output.mp3')
