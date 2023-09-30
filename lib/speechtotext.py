@@ -93,16 +93,16 @@ class SpeechToText:
 
                 self.unpressed_count += 1
 
-                logger.debug(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
+                # logger.debug(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
                 if self.pressed_count > self.config.stt_start_delay and not self.listening and not self.audio_listener_running:
-                    logger.info("Start listening...")
+                    logger.info("STT listening...")
                     self.listening = True
                     self.audio_stop_event.clear()
                     threading.Thread(target=self.audio_listener).start()
 
                 if self.unpressed_count > self.config.stt_stop_delay and self.listening and self.audio_listener_running:
                     self.pressed_count = 0
-                    logger.info("Stop listening...")
+                    logger.info("STT listening...")
                     self.audio_stop_event.set()
                     self.listening = False
 
