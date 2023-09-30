@@ -25,6 +25,8 @@ prompt_prefix = prompt_config.prompt_prefix
 
 ContextParser.install_spacy_model()
 
+message_history = -50
+
 disable_tts = False
 
 class LiveStreamChatBot:
@@ -258,7 +260,7 @@ class LiveStreamChatBot:
 
             self.all_messages_context.append(raw_output)
             self.all_messages_context.append({"role": "system", "content": f"{response}"})
-            self.all_messages_context = self.all_messages_context[-100:]
+            self.all_messages_context = self.all_messages_context[(message_history):]
 
             if not disable_tts:
                 # Generate TTS audio from the response and give it to a file
