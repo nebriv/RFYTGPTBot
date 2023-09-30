@@ -2,7 +2,12 @@ import threading
 import time
 from datetime import datetime
 import speech_recognition as sr
+from speech_recognition import exceptions as speech_recognition_exceptions
 from pynput import keyboard as pynput_keyboard
+try:
+    from lib.logger import logger
+except ImportError:
+    from logger import logger
 
 class SpeechToText:
     def __init__(self, bot=None):
@@ -37,7 +42,7 @@ class SpeechToText:
     def process_audio(self, audio):
         try:
             text = self.recognizer.recognize_google(audio)
-            print(f"You said: {text}")  # Replace print with logger.info
+            logger.info(f"You said: {text}")  # Replace print with logger.info
             message_data = {
                 "author": "Rocket Future",
                 "timestamp": datetime.now().isoformat(),
@@ -46,7 +51,7 @@ class SpeechToText:
             if self.bot:
                 self.bot.message_queue.put(message_data)
         except Exception as e:
-            print(f"Error processing audio: {e}")  # Replace print with logger.error
+            logger.error(f"Error processing audio: {e}")  # Replace print with logger.error
 
     def audio_listener(self):
         self.audio_listener_running = True
@@ -55,8 +60,10 @@ class SpeechToText:
                 try:
                     audio = self.recognizer.listen(source, timeout=2)
                     self.process_audio(audio)
+                except speech_recognition_exceptions.WaitTimeoutError as e:
+                    logger.debug(f"Timeout listening to audio: {e}")
                 except Exception as e:
-                    print(f"Error listening to audio: {e}")
+                    logger.error(f"Error listening to audio: {e}")
         self.audio_listener_running = False
 
     def on_press(self, key):
@@ -79,16 +86,16 @@ class SpeechToText:
 
                 self.unpressed_count += 1
 
-                print(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
+                logger.debug(f"Pressed count: {self.pressed_count}, Unpressed count: {self.unpressed_count}, Listening: {self.listening}, Audio listener running: {self.audio_listener_running}")
                 if self.pressed_count > 5 and not self.listening and not self.audio_listener_running:
-                    print("Start actual listening here...")
+                    logger.info("Start listening...")
                     self.listening = True
                     self.audio_stop_event.clear()
                     threading.Thread(target=self.audio_listener).start()
 
                 if self.unpressed_count > 5 and self.listening and self.audio_listener_running:
                     self.pressed_count = 0
-                    print("Stop actual listening here...")
+                    logger.info("Stop listening...")
                     self.audio_stop_event.set()
                     self.listening = False
 
