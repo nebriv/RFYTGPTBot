@@ -54,7 +54,12 @@ class LiveStreamChatBot:
                 sd.default.device = get_audio_device_by_name(self.config.tts_output_device_name,
                                                              self.config.tts_output_device_sample_rate)['ID']
             if self.config.tts_play_test_sound:
+                logger.info("Playing test sound...")
                 play_melody(sd.default.device)
+                logger.verbose("Test sound played.")
+                if input("Did you hear the test sound? (y/n)").lower() != 'y':
+                    logger.critical("Test sound not heard. Exiting.")
+                    exit()
 
 
         if not self.config.chat_fetcher_ytapi_enabled and not self.config.chat_fetcher_ytscraper_enabled:

@@ -74,7 +74,6 @@ def list_audio_devices():
 
 
 def play_note(frequency, duration=0.5, samplerate=44100):
-    print(sd.default.device)
     t = np.linspace(0, duration, int(samplerate * duration), endpoint=False)
     note = 0.5 * np.sin(2 * np.pi * frequency * t)
     sd.play(note, samplerate)
