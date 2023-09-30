@@ -68,7 +68,7 @@ class Config:
                 self.tts_name = config.get('TTS', 'name', fallback='en-US-Studio-O')
                 self.tts_ssml_gender = config.get('TTS', 'ssml_gender', fallback='FEMALE')
                 self.tts_audio_encoding = config.get('TTS', 'audio_encoding', fallback='MP3')
-                self.tts_play_test_sound = config.getboolean('TTS', 'play_test_sound', fallback=False)
+                self.tts_play_test_sound = config.getboolean('TTS', 'play_test_sound', fallback=True)
         except configparser.NoSectionError:
             logging.error("TTS section not found in config.ini!")
 
