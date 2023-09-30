@@ -207,7 +207,7 @@ class ContextParser:
         logger.verbose(f"Message properties: {message.get_properties()}")
         self.add_to_history(message)
 
-        logger.debug("self.config.context_parser_author_allowlist: " + str(self.config.context_parser_author_allowlist))
+        logger.debug(f"message author: {message.author} - self.config.context_parser_author_allowlist: {str(self.config.context_parser_author_allowlist)}")
         if message.author in self.config.context_parser_author_allowlist:
             logger.verbose(f"Message author is in the allowlist. Ignoring context parser.")
             return True
