@@ -17,7 +17,7 @@ from datetime import datetime
 import importlib
 from lib.context_parsing import ContextParser
 import logging
-from lib.utils import cleanup_folder, InputManager
+from lib.utils import cleanup_folder, InputManager, get_audio_device_by_name, get_audio_device_user_prompt_selection, play_melody
 from lib.speechtotext import SpeechToText
 
 prompt_prefix = prompt_config.prompt_prefix
@@ -45,6 +45,16 @@ class LiveStreamChatBot:
             exit()
 
 
+        if self.config.tts_enabled:
+            if self.config.tts_output_device_name is None:
+                selection = get_audio_device_user_prompt_selection()['ID']
+                print(f"Selected device ID: {selection}")
+                sd.default.device = selection
+            else:
+                sd.default.device = get_audio_device_by_name(self.config.tts_output_device_name,
+                                                             self.config.tts_output_device_sample_rate)['ID']
+            if self.config.tts_play_test_sound:
+                play_melody(sd.default.device)
 
 
         if not self.config.chat_fetcher_ytapi_enabled and not self.config.chat_fetcher_ytscraper_enabled:
@@ -342,7 +352,6 @@ class LiveStreamChatBot:
         # Set default sample rate
         sd.default.samplerate = fs
         try:
-            sd.default.device = self.config.tts_output_device
             # Play the audio
             sd.play(data)
         except sd.PortAudioError as err:
@@ -350,7 +359,7 @@ class LiveStreamChatBot:
             self.shutdown()
         except ValueError as err:
             if "No output device matching" in str(err) or "Error querying device" in str(err):
-                logger.critical(f"Invalid/missing output device: {self.config.tts_output_device}")
+                logger.critical(f"Invalid/missing output device: {self.config.tts_output_device_name}")
                 self.shutdown()
 
         # Block execution until audio is finished playing

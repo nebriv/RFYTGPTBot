@@ -11,7 +11,8 @@ from dateutil.parser import parse
 from dateutil.tz import gettz
 
 class Message:
-    def __init__(self, message, nlp):
+    def __init__(self, config, message, nlp):
+        self.config = config
         self.install_textblob_corpora()
         self.text = self.clean_text(message['message'])
         self.author = message['author']
@@ -45,14 +46,14 @@ class Message:
     @property
     def is_greeting(self):
         if self._is_greeting is None:
-            greetings = ["hello", "hi", "hey", "greetings", "sup"]
+            greetings = self.config.context_parser_greeting_words
             self._is_greeting = any(greet in self.tokens for greet in greetings)
         return self._is_greeting
 
     @property
     def is_question(self):
         if self._is_question is None:
-            question_starts = ["what", "who", "where", "when", "why", "how"]
+            question_starts = self.config.context_parser_question_starts
 
             self._is_question = (
                     any(sent.text.endswith('?') for sent in self.doc.sents) or
@@ -63,7 +64,7 @@ class Message:
 
     @property
     def is_short_message(self):
-        threshold = 3  # for example
+        threshold = self.config.context_parser_short_message_threshold
         return len(self.text.split()) < threshold
 
     @property
@@ -148,8 +149,11 @@ class ContextParser:
                 return True
         return False
 
-    def greetings_in_history(self, limit=3, time_limit=datetime.timedelta(minutes=5)):
+    def greetings_in_history(self, limit=3, time_limit=None):
         """Count the number of greetings in the recent message history."""
+        if time_limit is None:
+            datetime.timedelta(minutes=self.config.context_parser_greeting_time_limit)
+
         now = datetime.datetime.utcnow()
 
         recent_greetings = 0
@@ -174,7 +178,7 @@ class ContextParser:
             return False
 
         # Temporal Proximity (for this, we'll consider a time window of 5 minutes)
-        time_window = datetime.timedelta(seconds=30)
+        time_window = datetime.timedelta(seconds=self.config.context_parser_reply_time_limit)
         if new_message.timestamp - self.message_history[-1].timestamp <= time_window:
             logger.verbose(f"Message '{new_message.text}' is likely a reply as it was sent within {time_window} of the previous message.")
             return True
@@ -203,12 +207,16 @@ class ContextParser:
         logger.verbose(f"Message properties: {message.get_properties()}")
         self.add_to_history(message)
 
+        if message.author in self.config.context_parser_author_allowlist:
+            logger.verbose(f"Message author is in the allowlist. Ignoring context parser.")
+            return True
+
         if message.is_greeting:
             logger.verbose(f"Message is a greeting.")
             if self.is_directed_greeting(message, bot_name):
                 logger.verbose(f"Message is a directed greeting.")
                 return True
-            if self.greetings_in_history(limit=10) < 2:
+            if self.greetings_in_history(limit=self.config.context_parser_greeting_limit) < 2:
                 logger.verbose(f"Less than 2 greetings in the last 10 messages.")
                 return True
             else:
