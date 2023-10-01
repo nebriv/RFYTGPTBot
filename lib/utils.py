@@ -109,11 +109,14 @@ def play_sample_audio(duration=2, frequency=440):
     sd.play(x, samplerate)
     sd.wait()  # Wait until the audio is finished playing
 
-def get_audio_device_user_prompt_selection():
+def get_audio_device_user_prompt_selection(type=None):
     device_list = list_audio_devices()
     for device in device_list:
         print(f"Device ID: {device['ID']} --- Device Name: {device['Name']} --- Sample Rate: {device['Samplerate']} --- Type: {device['Type']}")
-    selected_id = input("Enter the ID of the device you want to select: ")
+    if type:
+        selected_id = input("Enter the ID of the desired %s device: " % type)
+    else:
+        selected_id = input("Enter the ID of the desired device: ")
     try:
         selected_id = int(selected_id)
         if 0 <= selected_id < len(device_list):

@@ -118,6 +118,9 @@ class Config:
             self.stt_start_delay = config.getint('STT', 'start_delay', fallback=5)
             self.stt_stop_delay = config.getint('STT', 'stop_delay', fallback=5)
             self.stt_listen_timeout = config.getint('STT', 'listen_timeout', fallback=1)
+            self.stt_input_device_name = config.get('STT', 'input_device_name', fallback=None)
+            self.stt_input_device_sample_rate = config.getfloat('STT', 'input_device_sample_rate', fallback=None)
+            self.stt_output_device_id = None
         except configparser.NoSectionError:
             logging.error("STT section not found in config.ini!")
 

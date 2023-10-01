@@ -44,16 +44,37 @@ class LiveStreamChatBot:
             logger.error(f"Channel {self.config.channel_id} is not currently live.")
             exit()
 
+        if self.config.stt_enabled:
+            if self.config.stt_input_device_name is None:
+                selection = get_audio_device_user_prompt_selection(type="input")
+                logger.verbose(f"Selected input device ID: {selection['ID']}")
+                logger.info(f"Selected input device Name: {selection['Name']}")
+                logger.info(f"Selected input device Sample Rate: {selection['Samplerate']}")
+                self.config.stt_input_device_id = selection['ID']
+            else:
+                self.config.stt_input_device_id = get_audio_device_by_name(self.config.stt_input_device_name, self.config.stt_input_device_sample_rate)['ID']
+                logger.info(f"Selected input device name from config: {self.config.stt_input_device_name}")
+
+            if self.config.stt_input_device_id is None:
+                logger.error("STT Output device name not specified. Please specify a device name in config.ini.")
+                exit()
 
         if self.config.tts_enabled:
             if self.config.tts_output_device_name is None:
-                selection = get_audio_device_user_prompt_selection()['ID']
-                print(f"Selected device ID: {selection}")
-                sd.default.device = selection
+                selection = get_audio_device_user_prompt_selection(type='output')
+                logger.verbose(f"Selected output device ID: {selection['ID']}")
+                logger.info(f"Selected output device name: {selection['Name']}")
+                logger.info(f"Selected output device Sample Rate: {selection['Samplerate']}")
+                sd.default.device = selection['ID']
             else:
                 sd.default.device = get_audio_device_by_name(self.config.tts_output_device_name,
                                                              self.config.tts_output_device_sample_rate)['ID']
+                logger.info(f"Selected output device name from config: {self.config.tts_output_device_name}")
+
             if self.config.tts_play_test_sound:
+
+                # If stt enabled replay the test captured audio. and see if it worked. If not retry the device selection again
+
                 logger.info("Playing test sound...")
                 play_melody(sd.default.device)
                 logger.verbose("Test sound played.")

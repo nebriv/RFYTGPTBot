@@ -62,7 +62,7 @@ class SpeechToText:
 
     def audio_listener(self):
         self.audio_listener_running = True
-        with sr.Microphone() as source:
+        with sr.Microphone(device_index=self.config.stt_input_device_id) as source:
             while not self.audio_stop_event.is_set() and self.listening:
                 try:
 
