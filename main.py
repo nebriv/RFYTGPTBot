@@ -403,7 +403,7 @@ class LiveStreamChatBot:
             if self.youtube_chat:
                 self.youtube_chat.start_threaded()
             if self.chat_scraper:
-                self.chat_scraper.start_threaded()
+               self.chat_scraper.start_threaded()
             logger.info(f"Letting chat gather for {self.config.chat_fetcher_startup_delay} seconds")
             for _ in range(self.config.chat_fetcher_startup_delay):
                 if self.stop_running:

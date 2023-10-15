@@ -211,6 +211,13 @@ class ContextParser:
         if message.author in self.config.context_parser_author_allowlist:
             logger.verbose(f"Message author is in the allowlist. Ignoring context parser.")
             return True
+        
+        # Check if the message contains any of the specified keywords
+        keywords = ["hopii", "hoppi", "hoppy", "hopi"]
+        if not any(keyword in message.text for keyword in keywords):
+            logger.verbose(f"Message does not contain any of the specified keywords.")
+            return False
+
 
         if message.is_greeting:
             logger.verbose(f"Message is a greeting.")
